@@ -1,0 +1,27 @@
+#This is sample code to check for proper setting of env variables.
+Add this code to your main server file and install fs
+##################################################################
+##################################################################
+
+npm install -save-dev fs
+
+import fs from "fs";
+
+logEnvVariables();
+
+function logEnvVariables() {
+	const envVariables = JSON.stringify(process.env, null, 2); // Convert process.env to a readable JSON string
+	const logFilePath = "./env-variables.log"; // Path to the log file
+
+	// Write the environment variables to the log file
+	fs.writeFile(logFilePath, envVariables, (err) => {
+		if (err) {
+			console.error(
+				"Failed to write environment variables to file:",
+				err
+			);
+		} else {
+			console.log(`Environment variables logged to ${logFilePath}`);
+		}
+	});
+}
