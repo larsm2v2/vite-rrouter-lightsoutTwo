@@ -15,14 +15,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
 const express_session_1 = __importDefault(require("express-session"));
 const passport_1 = __importDefault(require("./config/passport")); // Ensure this is correctly configured
 const crypto_1 = __importDefault(require("crypto"));
+const database_1 = __importDefault(require("./config/database"));
 const app = (0, express_1.default)();
 const requiredEnvVars = [
     "SESSION_SECRET",
     "GOOGLE_CLIENT_ID",
-    "GOGGLE_CLIENT_SECRET",
+    "GOOGLE_CLIENT_SECRET",
     "GOOGLE_CALLBACK_URL",
 ];
 requiredEnvVars.forEach((varName) => {
@@ -31,6 +33,10 @@ requiredEnvVars.forEach((varName) => {
     }
 });
 // Middleware
+app.use((0, cors_1.default)({
+    origin: "http://localhost:5173", // Your frontend URL
+    credentials: true, // Required for cookies/sessions
+}));
 app.use(express_1.default.json());
 app.use((0, express_session_1.default)({
     secret: process.env.SESSION_SECRET,
@@ -53,9 +59,9 @@ const GOOGLE_OAUTH_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
 ];
-app.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.get("/", (req, res) => {
     res.redirect("/login");
-}));
+});
 // Redirect to Google OAuth Consent Screen
 app.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const state = crypto_1.default.randomBytes(16).toString("hex");
@@ -65,7 +71,11 @@ app.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, function
     res.redirect(GOOGLE_OAUTH_CONSENT_SCREEN_URL);
 }));
 // Google OAuth Callback Route
-app.get("/google/callback", passport_1.default.authenticate("google", { failureRedirect: "/login" }), (req, res) => {
+app.get("/auth/google/callback", passport_1.default.authenticate("google", {
+    failureRedirect: "/login",
+    successRedirect: "/profile",
+    failureMessage: true,
+}), (req, res) => {
     // Successful authentication, redirect to profile
     res.redirect("/profile");
 });
@@ -83,6 +93,54 @@ app.get("/logout", (req, res) => {
 });
 app.get("/login", (req, res) => {
     res.send("Login Page");
+});
+// Auth check endpoint
+app.get("/auth/check", (req, res) => {
+    res.json({ authenticated: !!req.user });
+});
+// User data endpoint
+app.get("/user", (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: "Unauthorized" });
+    }
+    res.json(req.user);
+});
+app.get("/sample-stats", (req, res) => {
+    if (!req.user)
+        res.status(401).json({ error: "Unauthorized" });
+    res.json({
+        currentLevel: 5,
+        leastMoves: 18,
+    });
+});
+// Update your existing stats endpoint
+app.get("/stats/:userId", (req, res) => {
+    if (!req.user)
+        res.status(401).json({ error: "Unauthorized" });
+    try {
+        const stats = database_1.default
+            .prepare(`
+		SELECT currentLevel, leastMoves, customLevels
+		FROM game_stats 
+		WHERE userId = ?
+	  `)
+            .get(req.params.userId);
+        res.json(stats || {
+            currentLevel: 1,
+            leastMoves: [],
+            customLevels: [],
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Database error" });
+    }
+});
+// Enhanced logout
+app.post("/auth/logout", (req, res) => {
+    req.logout(() => {
+        res.json({ success: true });
+    });
 });
 // Start the server
 const PORT = process.env.PORT || 8000;

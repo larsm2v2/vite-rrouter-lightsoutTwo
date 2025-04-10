@@ -1,5 +1,6 @@
 #This is sample code to check for proper setting of env variables.
 Add this code to your main server file and install fs
+# Remember to add created log to gitignore
 ##################################################################
 ##################################################################
 

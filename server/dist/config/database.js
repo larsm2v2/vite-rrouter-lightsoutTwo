@@ -18,4 +18,14 @@ db.prepare(`
     email TEXT NOT NULL UNIQUE
   )
 `).run();
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS game_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER,
+  currentLevel INTEGER,
+  buttonsPressed TEXT,
+  savedMaps TEXT,
+  FOREIGN KEY (userId) REFERENCES users(id)
+)
+  `).run();
 exports.default = db;
