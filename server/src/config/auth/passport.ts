@@ -1,9 +1,8 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oidc";
-import db from "../database";
+import pool from "../database";
 import crypto from "crypto";
 import { Request } from "express";
-import { Database } from "better-sqlite3";
 import { User } from "../../types/entities/User";
 
 declare global {
@@ -11,11 +10,11 @@ declare global {
     interface User {
       id: number;
       email: string;
-      displayName: string;
+      display_name: string;
     }
   }
 }
-// Augment types with your custom fields
+
 declare module "passport-google-oidc" {
   interface Profile {
     _json: {
@@ -30,7 +29,6 @@ declare module "passport-google-oidc" {
   }
 }
 
-// Type for the verify callback
 type VerifyCallback = (
   error: Error | null,
   user?: Express.User | false,
@@ -57,67 +55,62 @@ passport.use(
           return done(new Error("Google email not verified"));
         }
 
-        // Type-safe user interface
-        interface User {
+        // Check for existing user
+        const userResult = await pool.query<{
           id: number;
           google_sub: string;
           email: string;
-          displayName: string;
-        }
-        interface DBUser {
-          id: number;
-          google_sub: string;
-          email: string;
-          displayName: string;
-        }
-        let user = db
-          .prepare<[string]>(
-            `
-      SELECT * FROM users 
-      WHERE google_sub = ?
-    `
-          )
-          .get(profile._json.sub) as User | undefined;
+          display_name: string;
+        }>(
+          `SELECT id, google_sub, email, display_name 
+           FROM users 
+           WHERE google_sub = $1`,
+          [profile._json.sub]
+        );
+
+        let user = userResult.rows[0];
 
         if (!user) {
           const tokenExpiry = new Date();
           tokenExpiry.setHours(tokenExpiry.getHours() + 1);
 
-          const { lastInsertRowid } = db
-            .prepare(
-              `
-        INSERT INTO users (
-          google_sub, 
-          email, 
-          displayName, 
-          avatar, 
-          google_access_token,
-          google_refresh_token,
-          token_expiry
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `
-            )
-            .run(
+          const insertResult = await pool.query<{ id: number }>(
+            `INSERT INTO users (
+              google_sub, 
+              email, 
+              display_name, 
+              avatar, 
+              google_access_token,
+              google_refresh_token,
+              token_expiry
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id`,
+            [
               profile._json.sub,
               profile._json.email,
-              profile._json.name || profile.displayName,
+              profile._json.name || profile.display_name,
               profile._json.picture,
               profile.accessToken ? encryptToken(profile.accessToken) : null,
               profile.refreshToken ? encryptToken(profile.refreshToken) : null,
-              tokenExpiry.toISOString()
-            ) as { lastInsertRowid: number };
+              tokenExpiry.toISOString(),
+            ]
+          );
 
-          user = db
-            .prepare<[number]>(
-              `
-        SELECT * FROM users 
-        WHERE id = ?
-      `
-            )
-            .get(lastInsertRowid) as User;
+          const newUserResult = await pool.query(
+            `SELECT id, email, display_name 
+             FROM users 
+             WHERE id = $1`,
+            [insertResult.rows[0].id]
+          );
+
+          user = newUserResult.rows[0];
         }
 
-        done(null, user);
+        done(null, {
+          id: user.id,
+          email: user.email,
+          display_name: user.display_name,
+        });
       } catch (err) {
         done(err instanceof Error ? err : new Error("Authentication failed"));
       }
@@ -125,7 +118,6 @@ passport.use(
   )
 );
 
-// Encryption helper with proper typing
 function encryptToken(token: string): string {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(
@@ -136,30 +128,20 @@ function encryptToken(token: string): string {
   return iv.toString("hex") + ":" + cipher.update(token, "utf8", "hex");
 }
 
-// Serialization types
 passport.serializeUser<number>((user: Express.User, done) => {
-  done(null, (user as any).id);
+  done(null, user.id);
 });
 
-passport.deserializeUser<number>((id: number, done) => {
+passport.deserializeUser<number>(async (id: number, done) => {
   try {
-    interface SafeUser {
-      id: number;
-      email: string;
-      displayName: string;
-    }
+    const result = await pool.query<Express.User>(
+      `SELECT id, email, display_name 
+       FROM users 
+       WHERE id = $1`,
+      [id]
+    );
 
-    const user = db
-      .prepare<[number]>(
-        `
-      SELECT id, email, displayName 
-      FROM users 
-      WHERE id = ?
-    `
-      )
-      .get(id) as User | undefined;
-
-    done(null, user || false);
+    done(null, result.rows[0] || false);
   } catch (err) {
     done(err instanceof Error ? err : undefined);
   }

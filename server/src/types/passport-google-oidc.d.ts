@@ -5,7 +5,7 @@ declare module "passport-google-oidc" {
 
   export interface Profile {
     id: string;
-    displayName: string;
+    display_name: string;
     _json: {
       sub: string;
       email: string;

@@ -5,13 +5,13 @@ import "./Profile.css";
 
 interface User {
   id: number;
-  displayName: string;
+  display_name: string;
   email: string;
   createdAt?: string;
 }
 
 interface Stats {
-  currentLevel: number;
+  current_level: number;
   bestTime: string;
   averageMoves: number;
   winRate: number;
@@ -51,9 +51,9 @@ const Profile = () => {
       <div className="profile-card">
         <div className="profile-header">
           <div className="avatar">
-            {user?.displayName.charAt(0).toUpperCase()}
+            {user?.display_name.charAt(0).toUpperCase()}
           </div>
-          <h1>{user?.displayName}</h1>
+          <h1>{user?.display_name}</h1>
           <p className="email">{user?.email}</p>
           <button onClick={handleLogout} className="logout-button">
             Sign out
@@ -65,7 +65,7 @@ const Profile = () => {
           <div className="stats-grid">
             <StatCard
               title="Current Level"
-              value={stats?.currentLevel || 1}
+              value={stats?.current_level || 1}
               icon="🏆"
             />
             <StatCard

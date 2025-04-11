@@ -1,26 +1,25 @@
 import session from "express-session";
-import SQLiteStore from "connect-sqlite3";
-import path from "path";
+import pgSession from "connect-pg-simple";
+import pool from "../database"; // Import your existing PostgreSQL pool
+import { env } from "process";
 
-const SQLiteSessionStore = SQLiteStore(session);
-
-export const sessionStore = new SQLiteSessionStore({
-  dir: path.join(__dirname, "../../sessions"),
-  db: "sessions.db",
-  concurrentDB: true,
-  ttl: 86400, // 24h in seconds
-});
+const PgSession = pgSession(session);
 
 export const sessionConfig: session.SessionOptions = {
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET!,
+  store: new PgSession({
+    pool: pool, // Reuse your existing connection pool
+    tableName: "user_sessions", // Custom table name (optional)
+    createTableIfMissing: true, // Automatically creates sessions table
+    pruneSessionInterval: false, // Disable auto-pruning (or set to interval in seconds)
+  }),
+  secret: env.SESSION_SECRET!,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: env.NODE_ENV === "production",
     sameSite: "lax",
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
-  name: "__Secure-auth", // Secure cookie name
+  name: "sessionId", // Custom session cookie name (optional)
 };

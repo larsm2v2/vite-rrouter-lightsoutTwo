@@ -5,7 +5,7 @@ declare global {
     interface User {
       id: number;
       email: string;
-      displayName: string;
+      display_name: string;
     }
   }
 }

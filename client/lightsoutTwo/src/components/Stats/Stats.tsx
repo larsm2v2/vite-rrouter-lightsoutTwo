@@ -3,7 +3,7 @@ import React from "react";
 interface UserStats {
   user: [
     { name: string },
-    { currentLevel: number },
+    { current_level: number },
     { currentBestNumberOfMoves: { [level: string]: number[] } }
   ];
 }

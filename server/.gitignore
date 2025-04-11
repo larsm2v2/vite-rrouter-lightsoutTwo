@@ -1,5 +1,6 @@
 # Ignore .env files
 .env
 .env.*
-
+notes.txt
+check-env.ts
 keycommands.txt

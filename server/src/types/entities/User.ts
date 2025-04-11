@@ -5,7 +5,7 @@ export interface User {
   id: number;
   googleSub?: string;
   email: string;
-  displayName: string;
+  display_name: string;
   avatar?: string;
 }
 
@@ -25,7 +25,7 @@ export const UserSchema = new EntitySchema<User>({
       type: String,
       unique: true,
     },
-    displayName: {
+    display_name: {
       type: String,
     },
     avatar: {
@@ -37,7 +37,7 @@ export const UserSchema = new EntitySchema<User>({
 
 export interface GameStats {
   id: number;
-  currentLevel: number;
-  buttonsPressed: string;
-  savedMaps: string;
+  current_level: number;
+  buttons_pressed: string;
+  saved_maps: string;
 }

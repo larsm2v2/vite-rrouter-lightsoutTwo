@@ -1,83 +1,74 @@
 // tests/database.test.ts
 process.env.NODE_ENV = "test";
 
-import db from "../config/database";
-import { User, GameStats } from "../types/entities/User"; // Assuming you have a GameStats type defined
+import pool from "../config/database";
+import { User, GameStats } from "../types/entities/User";
 
 describe("Database Operations", () => {
   let userId: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Seed the database with a test user
-    const result = db
-      .prepare(
-        "INSERT INTO users (googleId, displayName, email) VALUES (?, ?, ?)"
-      )
-      .run("test-google-id", "Test User", "test@example.com");
-
-    userId = result.lastInsertRowid as number; // Store the user ID for later use
+    const result = await pool.query(
+      `INSERT INTO users (google_sub, display_name, email) 
+       VALUES ($1, $2, $3) 
+       RETURNING id`,
+      ["test-google-id", "Test User", "test@example.com"]
+    );
+    userId = result.rows[0].id; // Store the user ID for later use
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Clean up the database after tests
-    db.prepare("DELETE FROM game_stats").run();
-    db.prepare("DELETE FROM users").run();
+    await pool.query("DELETE FROM game_stats");
+    await pool.query("DELETE FROM users");
+    await pool.end(); // Close the connection pool
   });
 
-  it("should retrieve a user by googleId", () => {
-    const user = db
-      .prepare("SELECT * FROM users WHERE googleId = ?")
-      .get("test-google-id") as User | undefined;
+  it("should retrieve a user by google_sub", async () => {
+    const result = await pool.query<User>(
+      "SELECT * FROM users WHERE google_sub = $1",
+      ["test-google-id"]
+    );
+    const user = result.rows[0];
 
-    expect(user).toBeDefined(); // Ensure user is not undefined
-    if (user) {
-      expect(user.displayName).toBe("Test User");
-      expect(user.email).toBe("test@example.com");
-    }
+    expect(user).toBeDefined();
+    expect(user.display_name).toBe("Test User");
+    expect(user.email).toBe("test@example.com");
   });
 
-  it("should create a new user", () => {
-    const result = db
-      .prepare(
-        "INSERT INTO users (googleId, displayName, email) VALUES (?, ?, ?)"
-      )
-      .run("new-google-id", "New User", "new@example.com");
+  it("should create a new user", async () => {
+    const result = await pool.query<User>(
+      `INSERT INTO users (google_sub, display_name, email) 
+       VALUES ($1, $2, $3) 
+       RETURNING *`,
+      ["new-google-id", "New User", "new@example.com"]
+    );
+    const user = result.rows[0];
 
-    const user = db
-      .prepare("SELECT * FROM users WHERE id = ?")
-      .get(result.lastInsertRowid) as User | undefined;
-
-    expect(user).toBeDefined(); // Ensure user is not undefined
-    if (user) {
-      expect(user.email).toBe("new@example.com");
-    }
+    expect(user).toBeDefined();
+    expect(user.email).toBe("new@example.com");
   });
 
-  it("should insert and retrieve game stats for a user", () => {
+  it("should insert and retrieve game stats for a user", async () => {
     // Insert a new game stat record
-    const buttonsPressed = JSON.stringify(["button1", "button2"]);
-    const savedMaps = JSON.stringify(["map1", "map2"]);
+    const buttons_pressed = ["button1", "button2"];
+    const saved_maps = ["map1", "map2"];
 
-    const result = db
-      .prepare(
-        "INSERT INTO game_stats (userId, currentLevel, buttonsPressed, savedMaps) VALUES (?, ?, ?, ?)"
-      )
-      .run(userId, 5, buttonsPressed, savedMaps);
+    const insertResult = await pool.query<GameStats>(
+      `INSERT INTO game_stats (user_id, current_level, buttons_pressed, saved_maps) 
+       VALUES ($1, $2, $3, $4) 
+       RETURNING *`,
+      [userId, 5, buttons_pressed, saved_maps]
+    );
 
     // Retrieve the inserted game stat record
-    const gameStats = db
-      .prepare("SELECT * FROM game_stats WHERE id = ?")
-      .get(result.lastInsertRowid) as GameStats | undefined;
+    const gameStats = insertResult.rows[0];
 
-    expect(gameStats).toBeDefined(); // Ensure gameStats is not undefined
-    if (gameStats) {
-      expect(gameStats.id).toBe(userId);
-      expect(gameStats.currentLevel).toBe(5);
-      expect(JSON.parse(gameStats.buttonsPressed)).toEqual([
-        "button1",
-        "button2",
-      ]);
-      expect(JSON.parse(gameStats.savedMaps)).toEqual(["map1", "map2"]);
-    }
+    expect(gameStats).toBeDefined();
+    expect(gameStats.id).toBe(userId);
+    expect(gameStats.current_level).toBe(5);
+    expect(gameStats.buttons_pressed).toEqual(buttons_pressed);
+    expect(gameStats.saved_maps).toEqual(saved_maps);
   });
 });
