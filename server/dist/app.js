@@ -76,10 +76,16 @@ app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
     origin: process.env.CLIENT_URL, // Your frontend URL
     credentials: true, // Required for cookies/sessions
+    methods: ["GET", "POST", "OPTIONS"],
+    exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
 }));
+app.options("*", (0, cors_1.default)());
 app.use((0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.path === "/auth/check",
 }));
 app.use(express_1.default.json());
 app.use((0, express_session_1.default)(sessions_1.sessionConfig));
@@ -93,6 +99,7 @@ const GOOGLE_OAUTH_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
 ];
+//Audit Log
 app.use((req, res, next) => {
     const startTime = Date.now();
     // Hook into response finish to log the outcome
@@ -123,7 +130,7 @@ app.use((req, res, next) => {
     next();
 });
 app.get("/", (req, res) => {
-    res.redirect("/login");
+    res.redirect(process.env.CLIENT_URL + "/login");
 });
 // Redirect to Google OAuth Consent Screen
 app.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -135,21 +142,54 @@ app.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, function
 }));
 // Google OAuth Callback Route
 app.get("/auth/google/callback", passport_1.default.authenticate("google", {
-    failureRedirect: "/login",
-    successRedirect: "/profile",
+    failureRedirect: process.env.CLIENT_URL + "/login",
+    successRedirect: process.env.CLIENT_URL + "/profile",
     failureMessage: true,
 }), (req, res) => {
     // Successful authentication, redirect to profile
-    res.redirect("/profile");
+    res.redirect(process.env.CLIENT_URL + "/profile");
 });
 // Protected routes
-app.get("/profile", (req, res) => {
+app.get("/profile", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // if (!req.user) return res.redirect("/login");
+    // res.json(req.user);
     if (!req.user)
-        return res.redirect("/login");
-    res.json(req.user);
-});
+        return res.status(401).json({ error: "Unauthorized" });
+    try {
+        // Get user profile
+        const userResult = yield database_1.default.query(`SELECT id, email, display_name, avatar 
+       FROM users WHERE id = $1`, [req.user.id]);
+        // Get game stats
+        const statsResult = yield database_1.default.query(`SELECT current_level, buttons_pressed, saved_maps
+       FROM game_stats WHERE user_id = $1`, [req.user.id]);
+        res.json({
+            user: userResult.rows[0],
+            stats: statsResult.rows[0] || {
+                current_level: 1,
+                buttons_pressed: [],
+                saved_maps: [],
+            },
+        });
+    }
+    catch (err) {
+        console.error("Profile error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
+}));
 app.get("/auth/check", (req, res) => {
-    res.json({ authenticated: !!req.user });
+    // res.json({ authenticated: !!req.user });
+    if (!req.user) {
+        return res.status(200).json({ authenticated: false });
+    }
+    // Return minimal user data for frontend
+    res.json({
+        authenticated: true,
+        user: {
+            id: req.user.id,
+            email: req.user.email,
+            display_name: req.user.display_name,
+        },
+    });
 });
 app.get("/user", (req, res) => {
     if (!req.user) {
@@ -185,9 +225,6 @@ app.get("/logout", (req, res) => {
         res.redirect("/");
     });
 });
-app.get("/login", (req, res) => {
-    res.send("Login Page");
-});
 app.get("/sample-stats", (req, res) => {
     if (!req.user)
         res.status(401).json({ error: "Unauthorized" });
@@ -210,6 +247,20 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: "Internal Server Error" });
 });
+const authRateLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 60, // Increased limit
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+        var _a;
+        // Explicitly return boolean (never undefined)
+        return (req.path === "/auth/check" &&
+            req.method === "GET" &&
+            !!((_a = req.get("Referer")) === null || _a === void 0 ? void 0 : _a.includes("/login")));
+    },
+});
+app.use(authRateLimiter);
 // Start the server
 function startServer() {
     return __awaiter(this, void 0, void 0, function* () {

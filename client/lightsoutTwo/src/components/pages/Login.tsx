@@ -1,15 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import apiClient from "./Client";
 import "./Login.css";
 
 const Login = () => {
   const navigate = useNavigate();
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:8000/auth/check")
-      .then((res) => res.json())
-      .then((data) => data.authenticated && navigate("/profile"));
-  }, [navigate]);
+    const controller = new AbortController();
+
+    const checkAuth = async () => {
+      try {
+        const { data } = await apiClient.get("/auth/check", {
+          signal: controller.signal,
+          withCredentials: true,
+        });
+
+        if (data.authenticated) {
+          navigate("/profile", { replace: true });
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+      } finally {
+        setAuthChecked(true);
+      }
+    };
+
+    if (!authChecked) checkAuth();
+
+    return () => controller.abort();
+  }, [navigate, authChecked]);
 
   return (
     <div className="login-container">

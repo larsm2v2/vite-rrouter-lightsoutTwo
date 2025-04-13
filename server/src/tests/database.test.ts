@@ -51,24 +51,30 @@ describe("Database Operations", () => {
   });
 
   it("should insert and retrieve game stats for a user", async () => {
-    // Insert a new game stat record
     const buttons_pressed = ["button1", "button2"];
     const saved_maps = ["map1", "map2"];
 
-    const insertResult = await pool.query<GameStats>(
-      `INSERT INTO game_stats (user_id, current_level, buttons_pressed, saved_maps) 
-       VALUES ($1, $2, $3, $4) 
+    // Insert with proper JSON conversion
+    const insertResult = await pool.query(
+      `INSERT INTO game_stats 
+       (user_id, current_level, buttons_pressed, saved_maps) 
+       VALUES ($1, $2, $3::jsonb, $4::jsonb) 
        RETURNING *`,
-      [userId, 5, buttons_pressed, saved_maps]
+      [userId, 5, JSON.stringify(buttons_pressed), JSON.stringify(saved_maps)]
     );
 
-    // Retrieve the inserted game stat record
-    const gameStats = insertResult.rows[0];
+    // Query to verify
+    const verifyResult = await pool.query(
+      `SELECT * FROM game_stats WHERE user_id = $1`,
+      [userId]
+    );
 
-    expect(gameStats).toBeDefined();
-    expect(gameStats.id).toBe(userId);
+    const gameStats = verifyResult.rows[0];
+    expect(gameStats.user_id).toBe(userId);
     expect(gameStats.current_level).toBe(5);
-    expect(gameStats.buttons_pressed).toEqual(buttons_pressed);
-    expect(gameStats.saved_maps).toEqual(saved_maps);
+
+    // Compare parsed JSON
+    expect(JSON.parse(gameStats.buttons_pressed)).toEqual(buttons_pressed);
+    expect(JSON.parse(gameStats.saved_maps)).toEqual(saved_maps);
   });
 });

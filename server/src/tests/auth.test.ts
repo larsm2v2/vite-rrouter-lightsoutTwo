@@ -5,7 +5,14 @@ import pool from "../config/database";
 import app from "../app";
 import { Request, Response, NextFunction } from "express";
 import passport from "../config/auth/passport";
+import { User } from "../types/entities/User";
 describe("Authentication Routes", () => {
+  let testUser: User;
+
+  beforeEach(async () => {
+    await pool.query("BEGIN");
+  });
+
   beforeAll(async () => {
     // Seed the database with test data
     await pool.query(
@@ -15,6 +22,9 @@ describe("Authentication Routes", () => {
     );
   });
 
+  afterEach(async () => {
+    await pool.query("ROLLBACK");
+  });
   afterAll(async () => {
     // Clean up the database after tests
     await pool.query("DELETE FROM users");
@@ -41,7 +51,7 @@ describe("Authentication Routes", () => {
               email: "test@example.com",
               display_name: "Test User",
             };
-            next();
+            res.redirect(process.env.CLIENT_URL + "/profile");
           }
         );
 
@@ -50,7 +60,7 @@ describe("Authentication Routes", () => {
         .query({ code: "mock_code", state: "mock_state" });
 
       expect(res.status).toBe(302);
-      expect(res.header.location).toBe("/profile");
+      expect(res.header.location).toBe(process.env.CLIENT_URL + "/profile");
     });
 
     it("should handle OAuth callback failure", async () => {

@@ -8,7 +8,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["jest", "node", "express"],
+    "types": [
+      "jest",
+      "node",
+      "express",
+      "express-rate-limit",
+      "express-session",
+      "passport"
+    ],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*", "src/tests/**/*"],

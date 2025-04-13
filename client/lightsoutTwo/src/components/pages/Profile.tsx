@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import apiClient from "./Client";
 import "./Profile.css";
 
 interface User {
@@ -23,27 +23,28 @@ const Profile = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProfile = async () => {
       try {
-        const userRes = await axios.get("http://localhost:8000/api/user");
-        setUser(userRes.data);
-
-        const statsRes = await axios.get(
-          `http://localhost:8000/api/stats/${userRes.data.id}`
-        );
-        setStats(statsRes.data);
+        const res = await apiClient.get("/profile");
+        const { userData, statsData } = res.data;
+        setUser(userData);
+        setStats(statsData);
       } catch (error) {
         console.log(error);
         navigate("/login");
       }
     };
 
-    fetchData();
+    fetchProfile();
   }, [navigate]);
 
   const handleLogout = async () => {
-    await axios.post("http://localhost:8000/auth/logout");
-    navigate("/login");
+    try {
+      await apiClient.post("/auth/logout");
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   return (

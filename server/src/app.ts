@@ -38,12 +38,18 @@ app.use(
   cors({
     origin: process.env.CLIENT_URL, // Your frontend URL
     credentials: true, // Required for cookies/sessions
+    methods: ["GET", "POST", "OPTIONS"],
+    exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
   })
 );
+app.options("*", cors());
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.path === "/auth/check",
   })
 );
 app.use(express.json());
@@ -60,6 +66,7 @@ const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
+//Audit Log
 app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
 
@@ -96,7 +103,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 app.get("/", (req: Request, res: Response) => {
-  res.redirect("/login");
+  res.redirect(process.env.CLIENT_URL + "/login");
 });
 // Redirect to Google OAuth Consent Screen
 app.get("/auth/google", async (req: Request, res: Response) => {
@@ -111,24 +118,66 @@ app.get("/auth/google", async (req: Request, res: Response) => {
 app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    failureRedirect: "/login",
-    successRedirect: "/profile",
+    failureRedirect: process.env.CLIENT_URL + "/login",
+    successRedirect: process.env.CLIENT_URL + "/profile",
     failureMessage: true,
   }),
   (req, res) => {
     // Successful authentication, redirect to profile
-    res.redirect("/profile");
+    res.redirect(process.env.CLIENT_URL + "/profile");
   }
 );
 
 // Protected routes
-app.get("/profile", (req, res) => {
-  if (!req.user) return res.redirect("/login");
-  res.json(req.user);
+app.get("/profile", async (req, res) => {
+  // if (!req.user) return res.redirect("/login");
+  // res.json(req.user);
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    // Get user profile
+    const userResult = await pool.query(
+      `SELECT id, email, display_name, avatar 
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+
+    // Get game stats
+    const statsResult = await pool.query(
+      `SELECT current_level, buttons_pressed, saved_maps
+       FROM game_stats WHERE user_id = $1`,
+      [req.user.id]
+    );
+
+    res.json({
+      user: userResult.rows[0],
+      stats: statsResult.rows[0] || {
+        current_level: 1,
+        buttons_pressed: [],
+        saved_maps: [],
+      },
+    });
+  } catch (err) {
+    console.error("Profile error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 app.get("/auth/check", (req, res) => {
-  res.json({ authenticated: !!req.user });
+  // res.json({ authenticated: !!req.user });
+  if (!req.user) {
+    return res.status(200).json({ authenticated: false });
+  }
+
+  // Return minimal user data for frontend
+  res.json({
+    authenticated: true,
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      display_name: req.user.display_name,
+    },
+  });
 });
 
 app.get("/user", (req, res) => {
@@ -176,10 +225,6 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.get("/login", (req, res) => {
-  res.send("Login Page");
-});
-
 app.get("/sample-stats", (req, res) => {
   if (!req.user) res.status(401).json({ error: "Unauthorized" });
 
@@ -204,12 +249,45 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ error: "Internal Server Error" });
 });
 
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 60, // Increased limit
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Explicitly return boolean (never undefined)
+    return (
+      req.path === "/auth/check" &&
+      req.method === "GET" &&
+      !!req.get("Referer")?.includes("/login")
+    );
+  },
+});
+app.use(authRateLimiter);
+
 // Start the server
 async function startServer() {
   await initializeDatabase();
   const PORT = process.env.PORT || 8000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
+if (process.env.NODE_ENV !== "test") {
+  startServer(); // Only start server when not testing
+}
 
-startServer();
+if (process.env.NODE_ENV === "test") {
+  app.post("/test/mock-login", async (req, res) => {
+    // Create a minimal valid User object
+    const mockUser: Express.User = {
+      id: req.body.userId,
+      email: "test@example.com",
+      display_name: "Test User",
+    };
+
+    req.logIn(mockUser, (err) => {
+      if (err) return res.status(500).send(err);
+      res.send("OK");
+    });
+  });
+}
 export default app;

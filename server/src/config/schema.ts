@@ -24,16 +24,21 @@ async function createTables() {
 
     // Game stats
     await client.query(`
-      CREATE TABLE IF NOT EXISTS game_stats (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        current_level INTEGER DEFAULT 1 CHECK (current_level > 0),
-        buttons_pressed JSONB,
-        saved_maps JSONB,
-        UNIQUE(user_id)
-      );
+  CREATE TABLE IF NOT EXISTS game_stats (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    current_level INTEGER DEFAULT 1 CHECK (current_level > 0),
+    buttons_pressed JSONB NOT NULL DEFAULT '[]'::jsonb,
+    saved_maps JSONB NOT NULL DEFAULT '[]'::jsonb,
+    UNIQUE(user_id)
+  );
     `);
-
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INT PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT NOW()
+);
+        `);
     // Audit log
     await client.query(`
       CREATE TABLE IF NOT EXISTS audit_log (
@@ -54,7 +59,13 @@ async function createTables() {
       CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
       CREATE INDEX IF NOT EXISTS idx_game_stats_user_id ON game_stats(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_log_user_action ON audit_log(user_id, action);
     `);
+
+    // Comments
+    await client.query(`
+      COMMENT ON COLUMN users.google_sub IS 'Google OAuth subject identifier';
+      `);
 
     await client.query("COMMIT");
     console.log("✅ Tables created successfully");
