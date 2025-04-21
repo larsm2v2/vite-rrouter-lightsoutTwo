@@ -17,13 +17,24 @@ export async function createCompleteTestUser() {
   await pool.query(`INSERT INTO game_stats (user_id) VALUES ($1)`, [user.id]);
   return user;
 }
+
 export async function cleanupTestData() {
-  await pool.query("DELETE FROM game_stats");
-  await pool.query("DELETE FROM users");
+  try {
+    await pool.query("DELETE FROM game_stats");
+    await pool.query("DELETE FROM users");
+  } catch (err) {
+    console.error('Error cleaning up test data:', err);
+  }
 }
 
+// Clean up after each test
 afterEach(async () => {
   await cleanupTestData();
+});
+
+// Clean up after all tests
+afterAll(async () => {
+  await pool.end();
 });
 
 export function toJsonb(value: any): string {

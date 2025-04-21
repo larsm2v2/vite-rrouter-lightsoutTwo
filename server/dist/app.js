@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -52,10 +19,11 @@ const cors_1 = __importDefault(require("cors"));
 const express_session_1 = __importDefault(require("express-session"));
 const passport_1 = __importDefault(require("./config/auth/passport")); // Ensure this is correctly configured
 const sessions_1 = require("./config/auth/sessions");
-const crypto = __importStar(require("crypto"));
 const database_1 = __importDefault(require("./config/database"));
 const schema_1 = require("./config/schema");
 const helmet_1 = __importDefault(require("helmet"));
+const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const puzzles_routes_1 = __importDefault(require("./routes/puzzles.routes"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const express_validator_1 = require("express-validator");
 const app = (0, express_1.default)();
@@ -74,7 +42,23 @@ requiredEnvVars.forEach((varName) => {
 // Middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
-    origin: process.env.CLIENT_URL, // Your frontend URL
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, curl)
+        if (!origin)
+            return callback(null, true);
+        const allowedOrigins = [
+            process.env.CLIENT_URL,
+            'http://localhost:5173',
+            'http://localhost:5174'
+        ];
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        }
+        else {
+            console.log(`Origin ${origin} not allowed by CORS`);
+            callback(null, false);
+        }
+    },
     credentials: true, // Required for cookies/sessions
     methods: ["GET", "POST", "OPTIONS"],
     exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
@@ -88,9 +72,21 @@ app.use((0, express_rate_limit_1.default)({
     skip: (req) => req.path === "/auth/check",
 }));
 app.use(express_1.default.json());
+// Add URL-encoded middleware to handle form data
+app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, express_session_1.default)(sessions_1.sessionConfig));
 app.use(passport_1.default.initialize());
 app.use(passport_1.default.session());
+// Add request logger middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    console.log('Headers:', req.headers);
+    next();
+});
+// Mount auth routes
+app.use("/auth", auth_routes_1.default);
+// Mount puzzle routes
+app.use("/puzzles", puzzles_routes_1.default);
 // Google OAuth Configuration
 const GOOGLE_OAUTH_URL = process.env.GOOGLE_OAUTH_URL;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -106,6 +102,10 @@ app.use((req, res, next) => {
     res.on("finish", () => __awaiter(void 0, void 0, void 0, function* () {
         var _a;
         try {
+            // Skip audit logging for test routes
+            if (process.env.NODE_ENV === "test" && req.path.startsWith("/test/")) {
+                return;
+            }
             yield database_1.default.query(`INSERT INTO audit_log (
           user_id, action, endpoint, ip_address, 
           user_agent, status_code, metadata
@@ -124,7 +124,10 @@ app.use((req, res, next) => {
             ]);
         }
         catch (err) {
-            console.error("Audit log failed:", err instanceof Error ? err.message : String(err));
+            // Only log errors in non-test environment
+            if (process.env.NODE_ENV !== "test") {
+                console.error("Audit log failed:", err instanceof Error ? err.message : String(err));
+            }
         }
     }));
     next();
@@ -132,27 +135,17 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
     res.redirect(process.env.CLIENT_URL + "/login");
 });
-// Redirect to Google OAuth Consent Screen
-app.get("/auth/google", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const state = crypto.randomBytes(16).toString("hex");
-    req.session.state = state; // Save state to session
-    const scopes = GOOGLE_OAUTH_SCOPES.join(" ");
-    const GOOGLE_OAUTH_CONSENT_SCREEN_URL = `${GOOGLE_OAUTH_URL}?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_CALLBACK_URL}&access_type=offline&response_type=code&state=${state}&scope=${scopes}`;
-    res.redirect(GOOGLE_OAUTH_CONSENT_SCREEN_URL);
-}));
-// Google OAuth Callback Route
-app.get("/auth/google/callback", passport_1.default.authenticate("google", {
-    failureRedirect: process.env.CLIENT_URL + "/login",
-    successRedirect: process.env.CLIENT_URL + "/profile",
-    failureMessage: true,
-}), (req, res) => {
-    // Successful authentication, redirect to profile
-    res.redirect(process.env.CLIENT_URL + "/profile");
-});
 // Protected routes
 app.get("/profile", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // if (!req.user) return res.redirect("/login");
-    // res.json(req.user);
+    // For tests, add debug logging
+    if (process.env.NODE_ENV === 'test') {
+        console.log("Profile request:", {
+            hasUser: !!req.user,
+            user: req.user,
+            sessionID: req.sessionID,
+            hasSession: !!req.session,
+        });
+    }
     if (!req.user)
         return res.status(401).json({ error: "Unauthorized" });
     try {
@@ -160,15 +153,23 @@ app.get("/profile", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const userResult = yield database_1.default.query(`SELECT id, email, display_name, avatar 
        FROM users WHERE id = $1`, [req.user.id]);
         // Get game stats
-        const statsResult = yield database_1.default.query(`SELECT current_level, buttons_pressed, saved_maps
+        const statsResult = yield database_1.default.query(`SELECT current_level, best_combination, saved_maps
        FROM game_stats WHERE user_id = $1`, [req.user.id]);
+        // Base stats (ensure defaults)
+        const baseStats = statsResult.rows[0] || {
+            current_level: 1,
+            best_combination: [],
+            saved_maps: [],
+        };
+        // Fetch minimum moves for all classic levels
+        const { rows: minMovesRows } = yield database_1.default.query(`SELECT level, min_moves FROM classic_puzzles WHERE difficulty = '' OR difficulty = 'classic'`);
+        const minMovesMap = {};
+        minMovesRows.forEach((row) => {
+            minMovesMap[row.level] = row.min_moves;
+        });
         res.json({
             user: userResult.rows[0],
-            stats: statsResult.rows[0] || {
-                current_level: 1,
-                buttons_pressed: [],
-                saved_maps: [],
-            },
+            stats: Object.assign(Object.assign({}, baseStats), { min_moves: minMovesMap }),
         });
     }
     catch (err) {
@@ -243,10 +244,127 @@ app.post("/auth/logout", (req, res) => {
         });
     });
 });
+app.post("/game/progress", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!req.user)
+        return res.status(401).json({ error: "Unauthorized" });
+    try {
+        const { level, moves, completed } = req.body;
+        // Validate input
+        if (!level || typeof level !== 'number') {
+            return res.status(400).json({ error: "Invalid level" });
+        }
+        // First, get the current level
+        const userStatsResult = yield database_1.default.query(`SELECT current_level, best_combination 
+       FROM game_stats WHERE user_id = $1`, [req.user.id]);
+        const userStats = userStatsResult.rows[0];
+        const currentLevel = (userStats === null || userStats === void 0 ? void 0 : userStats.current_level) || 1;
+        // Only update level if the completed level is the current one
+        // and we're moving to the next level
+        let newLevel = currentLevel;
+        if (completed && level === currentLevel) {
+            newLevel = currentLevel + 1;
+        }
+        // Store the moves as best combination if better than current
+        // or if no best combination exists for this level
+        let bestCombination = (userStats === null || userStats === void 0 ? void 0 : userStats.best_combination) || [];
+        if (Array.isArray(bestCombination)) {
+            // If this level doesn't have a best combination yet or new moves is better
+            if (!bestCombination[level - 1] || moves < bestCombination[level - 1]) {
+                // Create a copy of the array with the right length
+                const newBestCombination = [...bestCombination];
+                // Make sure the array is long enough
+                while (newBestCombination.length < level) {
+                    newBestCombination.push(null);
+                }
+                // Set the new best for this level
+                newBestCombination[level - 1] = moves;
+                bestCombination = newBestCombination;
+            }
+        }
+        // Update the database
+        yield database_1.default.query(`UPDATE game_stats
+       SET current_level = $1, best_combination = $2
+       WHERE user_id = $3`, [newLevel, JSON.stringify(bestCombination), req.user.id]);
+        res.json({
+            success: true,
+            current_level: newLevel,
+            best_combination: bestCombination
+        });
+    }
+    catch (err) {
+        console.error("Game progress update error:", err);
+        res.status(500).json({ error: "Database error" });
+    }
+}));
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: "Internal Server Error" });
+    // Log the error with stack trace
+    console.error('Server error:', err);
+    console.error('Error stack:', err.stack);
+    // For OAuth errors, add more detailed logging
+    if (req.path.includes('/auth/google') || req.path.includes('/callback')) {
+        console.error('OAuth error details:', {
+            path: req.path,
+            method: req.method,
+            query: req.query,
+            session: req.session ? 'Session exists' : 'No session',
+            user: req.user ? 'User exists' : 'No user',
+        });
+    }
+    // Don't expose error details in production
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+    else {
+        // In development, return the error details
+        return res.status(500).json({
+            error: "Internal Server Error",
+            message: err.message,
+            stack: err.stack,
+        });
+    }
 });
+// Initialize database for tests
+if (process.env.NODE_ENV === 'test') {
+    (0, schema_1.initializeDatabase)()
+        .then(() => console.log("✅ Test database initialized"))
+        .catch(err => console.error("❌ Test database initialization failed:", err));
+}
+// Test routes - only available in test environment
+if (process.env.NODE_ENV === 'test') {
+    app.post("/test/mock-login", (req, res, next) => {
+        console.log("Mock login request:", {
+            userId: req.body.userId,
+            sessionID: req.sessionID,
+        });
+        // Create test user object
+        const testUser = {
+            id: req.body.userId,
+            email: "test@example.com",
+            display_name: "Test User",
+        };
+        // Login with the test user
+        req.login(testUser, { session: true }, (err) => {
+            if (err) {
+                console.error("Login error:", err);
+                return res.status(500).json({ error: err.message });
+            }
+            // Save the session
+            req.session.save((err) => {
+                if (err) {
+                    console.error("Session save error:", err);
+                    return res.status(500).json({ error: err.message });
+                }
+                console.log("Login successful:", {
+                    user: req.user,
+                    sessionID: req.sessionID,
+                    sessionCookie: req.sessionID && res.getHeader('set-cookie'),
+                });
+                // Return success with the cookie
+                return res.status(200).json({ success: true });
+            });
+        });
+    });
+}
 const authRateLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 60, // Increased limit
@@ -269,5 +387,7 @@ function startServer() {
         app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     });
 }
-startServer();
+if (process.env.NODE_ENV !== "test") {
+    startServer(); // Only start server when not testing
+}
 exports.default = app;

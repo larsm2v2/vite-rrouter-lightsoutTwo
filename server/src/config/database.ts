@@ -1,6 +1,7 @@
 // src/database.ts
-import { Pool, PoolConfig } from "pg";
+import { Pool } from "pg";
 import { env } from "process";
+import { testPool } from "./test-config";
 
 declare global {
   namespace Express {
@@ -11,8 +12,9 @@ declare global {
     }
   }
 }
+
 // PostgreSQL configuration
-const pgConfig: PoolConfig =
+const pgConfig =
   process.env.NODE_ENV === "test"
     ? {
         user: env.PG_USER || "postgres",
@@ -35,8 +37,8 @@ const pgConfig: PoolConfig =
         connectionTimeoutMillis: 2000,
       };
 
-// Create the connection pool
-const pool = new Pool(pgConfig);
+// Use test pool in test environment
+const pool = process.env.NODE_ENV === "test" ? testPool : new Pool(pgConfig);
 
 // Test the connection
 if (process.env.NODE_ENV !== "test") {

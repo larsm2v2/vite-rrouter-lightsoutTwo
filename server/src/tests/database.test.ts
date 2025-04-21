@@ -3,11 +3,15 @@ process.env.NODE_ENV = "test";
 
 import pool from "../config/database";
 import { User, GameStats } from "../types/entities/User";
+import { initializeDatabase } from "../config/schema";
 
 describe("Database Operations", () => {
   let userId: number;
 
   beforeAll(async () => {
+    // Initialize database tables
+    await initializeDatabase();
+    
     // Seed the database with a test user
     const result = await pool.query(
       `INSERT INTO users (google_sub, display_name, email) 
@@ -73,8 +77,8 @@ describe("Database Operations", () => {
     expect(gameStats.user_id).toBe(userId);
     expect(gameStats.current_level).toBe(5);
 
-    // Compare parsed JSON
-    expect(JSON.parse(gameStats.buttons_pressed)).toEqual(buttons_pressed);
-    expect(JSON.parse(gameStats.saved_maps)).toEqual(saved_maps);
+    // Compare JSONB data directly
+    expect(gameStats.buttons_pressed).toEqual(buttons_pressed);
+    expect(gameStats.saved_maps).toEqual(saved_maps);
   });
 });

@@ -15,6 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeDatabase = initializeDatabase;
 // src/schema.ts
 const database_1 = __importDefault(require("./database"));
+const create_classic_puzzles_1 = __importDefault(require("../migrations/create_classic_puzzles"));
+const create_custom_puzzles_1 = __importDefault(require("../migrations/create_custom_puzzles"));
+// Add a lock to prevent concurrent initialization
+let isInitializing = false;
+let initializationPromise = null;
 function createTables() {
     return __awaiter(this, void 0, void 0, function* () {
         const client = yield database_1.default.connect();
@@ -24,8 +29,11 @@ function createTables() {
             yield client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        google_sub TEXT NOT NULL UNIQUE,
+        google_sub TEXT UNIQUE,
         email TEXT NOT NULL UNIQUE CHECK (email ~* '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$'),
+        username TEXT UNIQUE,
+        password TEXT,
+        password_salt TEXT,
         display_name TEXT NOT NULL,
         avatar TEXT,
         google_access_token TEXT,
@@ -37,15 +45,21 @@ function createTables() {
     `);
             // Game stats
             yield client.query(`
-      CREATE TABLE IF NOT EXISTS game_stats (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        current_level INTEGER DEFAULT 1 CHECK (current_level > 0),
-        buttons_pressed JSONB,
-        saved_maps JSONB,
-        UNIQUE(user_id)
-      );
+  CREATE TABLE IF NOT EXISTS game_stats (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    current_level INTEGER DEFAULT 1 CHECK (current_level > 0),
+    best_combination JSONB NOT NULL DEFAULT '[]'::jsonb,
+    saved_maps JSONB NOT NULL DEFAULT '[]'::jsonb,
+    UNIQUE(user_id)
+  );
     `);
+            yield client.query(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INT PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT NOW()
+);
+        `);
             // Audit log
             yield client.query(`
       CREATE TABLE IF NOT EXISTS audit_log (
@@ -65,6 +79,24 @@ function createTables() {
       CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
       CREATE INDEX IF NOT EXISTS idx_game_stats_user_id ON game_stats(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_log_user_action ON audit_log(user_id, action);
+    `);
+            // Comments
+            yield client.query(`
+      COMMENT ON COLUMN users.google_sub IS 'Google OAuth subject identifier';
+      `);
+            // Classic puzzles table
+            yield client.query(`
+      CREATE TABLE IF NOT EXISTS classic_puzzles (
+        id SERIAL PRIMARY KEY,
+        difficulty TEXT NOT NULL,
+        level INTEGER NOT NULL,
+        pattern INTEGER[] NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        min_moves INTEGER,
+        UNIQUE(difficulty, level)
+      );
     `);
             yield client.query("COMMIT");
             console.log("✅ Tables created successfully");
@@ -79,10 +111,35 @@ function createTables() {
         }
     });
 }
-// Run table creation
 function initializeDatabase() {
     return __awaiter(this, void 0, void 0, function* () {
-        yield createTables().catch(console.error);
+        try {
+            // Return existing promise if already initializing
+            if (isInitializing) {
+                return initializationPromise;
+            }
+            // Set lock
+            isInitializing = true;
+            // Create new initialization promise
+            initializationPromise = createTables()
+                .catch(err => {
+                console.error("Database initialization error:", err);
+                throw err;
+            })
+                .finally(() => {
+                // Release lock
+                isInitializing = false;
+            });
+            // Create classic_puzzles table first
+            yield (0, create_classic_puzzles_1.default)();
+            // Then replace with custom puzzles
+            yield (0, create_custom_puzzles_1.default)();
+            console.log("Database schema initialization completed successfully");
+        }
+        catch (error) {
+            console.error("Error initializing database schema:", error);
+            throw error;
+        }
     });
 }
 exports.default = database_1.default;

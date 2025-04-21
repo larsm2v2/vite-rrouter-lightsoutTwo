@@ -3,14 +3,15 @@
   min-height: 100vh;
   align-items: center;
   justify-content: center;
-  background-color: #f9fafb;
+  background-color: #242424;
+  color: #f9fafb;
   padding: 1rem;
 }
 
 .profile-card {
   width: 100%;
-  max-width: 500px;
-  background: white;
+  max-width: 600px;
+  background: #242424;
   border-radius: 0.5rem;
   box-shadow: var(--shadow);
   padding: 2rem;
@@ -38,12 +39,12 @@
 .profile-header h1 {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--text);
+  color: #f9fafb;
   margin-bottom: 0.25rem;
 }
 
 .email {
-  color: var(--text-light);
+  color: #f9fafb;
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
 }
@@ -54,7 +55,7 @@
   background: none;
   border: 1px solid var(--border);
   border-radius: 0.375rem;
-  color: var(--text-light);
+  color: #f9fafb;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -71,7 +72,7 @@
 .stats-section h2 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text);
+  color: #f9fafb;
   margin-bottom: 1rem;
 }
 
@@ -83,7 +84,7 @@
 
 .stat-card {
   padding: 1rem;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 0.375rem;
   text-align: center;
 }
@@ -96,18 +97,81 @@
 .stat-card h3 {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-light);
+  color: #f9fafb;
   margin-bottom: 0.25rem;
 }
 
 .stat-card p {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text);
+  color: #f9fafb;
+}
+
+/* Recent Levels Section */
+.recent-levels-section {
+  margin-bottom: 2rem;
+}
+
+.recent-levels-section h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-bottom: 1rem;
+}
+
+.levels-table {
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.levels-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background-color: #333333;
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.level-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: 1px solid var(--border);
+  color: #f9fafb;
+}
+
+.level-cell {
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  color: #f9fafb;
+}
+
+.level-action-button {
+  padding: 0.375rem 0.75rem;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.level-action-button:hover {
+  background-color: var(--primary-hover);
+}
+
+.no-data {
+  text-align: center;
+  color: var(--text-light);
+  padding: 1.5rem;
+  font-style: italic;
 }
 
 .game-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
@@ -118,6 +182,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
+  min-width: 120px;
 }
 
 .action-button.primary {
@@ -138,4 +203,73 @@
 
 .action-button.secondary:hover {
   background-color: #f3f4f6;
+}
+
+.action-button.create {
+  background-color: #10b981; /* Green color for create button */
+  color: white;
+  border: none;
+}
+
+.action-button.create:hover {
+  background-color: #059669;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .game-actions {
+    flex-direction: column;
+  }
+  
+  .levels-header, .level-row {
+    font-size: 0.875rem;
+  }
+}
+
+/* Dark mode overrides for Profile page */
+.profile-header h1,
+.profile-header .email,
+.logout-button {
+  color: #f9fafb;
+}
+
+.stats-section h2,
+.recent-levels-section h2,
+.saved-maps-section h2 {
+  color: #f9fafb;
+}
+
+.levels-header {
+  background-color: #333333;
+}
+
+.profile-container .levels-header,
+.profile-container .level-row,
+.profile-container .level-cell,
+.profile-container .no-data {
+  color: #f9fafb;
+}
+
+.stat-card h3,
+.stat-card p {
+  color: #f9fafb;
+}
+
+.action-button.primary,
+.action-button.secondary,
+.action-button.create {
+  color: #f9fafb;
+}
+
+/* Saved Maps button styled for dark mode */
+.saved-maps-button {
+  background-color: #242424;
+  border: none;
+  color: #f9fafb;
+}
+.saved-maps-button:hover {
+  background-color: #333333;
 }

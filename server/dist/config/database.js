@@ -1,43 +1,47 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 // src/database.ts
 const pg_1 = require("pg");
 const process_1 = require("process");
+const test_config_1 = require("./test-config");
 // PostgreSQL configuration
-const pgConfig = {
-    user: process_1.env.PG_USER || "postgres",
-    host: process_1.env.PG_HOST || "localhost",
-    database: process_1.env.PG_DATABASE || "TTLO",
-    password: process_1.env.PG_PASSWORD || "your_password",
-    port: parseInt(process_1.env.PG_PORT || "5432"),
-    max: 20, // max number of clients in the pool
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-};
-// Create the connection pool
-const pool = new pg_1.Pool(pgConfig);
+const pgConfig = process.env.NODE_ENV === "test"
+    ? {
+        user: process_1.env.PG_USER || "postgres",
+        host: process.env.PG_HOST_TEST || "localhost",
+        database: process.env.PG_DATABASE_TEST || "ttlo_test",
+        password: process_1.env.PG_PASSWORD || "your_password",
+        port: parseInt(process_1.env.PG_PORT || "5432"),
+        max: 20, // max number of clients in the pool
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    }
+    : {
+        user: process_1.env.PG_USER || "postgres",
+        host: process_1.env.PG_HOST || "localhost",
+        database: process_1.env.PG_DATABASE || "TTLO",
+        password: process_1.env.PG_PASSWORD || "your_password",
+        port: parseInt(process_1.env.PG_PORT || "5432"),
+        max: 20, // max number of clients in the pool
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    };
+// Use test pool in test environment
+const pool = process.env.NODE_ENV === "test" ? test_config_1.testPool : new pg_1.Pool(pgConfig);
 // Test the connection
-pool
-    .query("SELECT NOW() as now")
-    .then((res) => {
-    console.log("✅ PostgreSQL connected at:", res.rows[0].now);
-})
-    .catch((err) => {
-    console.error("❌ PostgreSQL connection error:", err);
-    process.exit(1);
-});
-// Graceful shutdown
-process.on("SIGINT", () => __awaiter(void 0, void 0, void 0, function* () {
-    yield pool.end();
-    process.exit(0);
-}));
+if (process.env.NODE_ENV !== "test") {
+    pool
+        .query("SELECT NOW() as now")
+        .then((res) => {
+        if (process.env.NODE_ENV !== "test") {
+            console.log("✅ PostgreSQL connected");
+        }
+    })
+        .catch((err) => {
+        console.error("❌ PostgreSQL connection error:", err);
+        if (process.env.NODE_ENV !== "test") {
+            process.exit(1); // Only exit in non-test environments
+        }
+    });
+}
 exports.default = pool;

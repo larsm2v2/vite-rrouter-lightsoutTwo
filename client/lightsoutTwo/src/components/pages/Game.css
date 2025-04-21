@@ -1,0 +1,165 @@
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.game-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.game-stats {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-button, .index-toggle-button, .mode-toggle-button {
+  background-color: #555;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 8px;
+}
+
+.back-button:hover, .index-toggle-button:hover, .mode-toggle-button:hover {
+  background-color: #444;
+}
+
+/* Special styling for the mode toggle */
+.mode-toggle-button {
+  background-color: #6a5acd; /* SlateBlue */
+}
+
+.mode-toggle-button:hover {
+  background-color: #483d8b; /* DarkSlateBlue */
+}
+
+/* Difficulty selector */
+.difficulty-select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background-color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.difficulty-select:focus {
+  outline: none;
+  border-color: #6a5acd;
+  box-shadow: 0 0 0 2px rgba(106, 90, 205, 0.3);
+}
+
+/* Loading and error messages */
+.loading-message, .error-message {
+  padding: 2rem;
+  margin: 2rem 0;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.loading-message {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #555;
+}
+
+.error-message {
+  background-color: rgba(255, 0, 0, 0.1);
+  color: #d32f2f;
+}
+
+.light-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.light-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.light-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.light-button.on {
+  background-color: #ff69b4;
+  box-shadow: 0 0 15px rgba(255, 105, 180, 0.7);
+}
+
+.light-button.off {
+  background-color: #333;
+}
+
+.win-message {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 2rem;
+  border-radius: 10px;
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+.next-level-button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: background-color 0.2s;
+}
+
+.next-level-button:hover {
+  background-color: #3e8e41;
+}
+
+@media (max-width: 600px) {
+  .game-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .game-stats {
+    flex-wrap: wrap;
+  }
+  
+  .light-button {
+    width: 45px;
+    height: 45px;
+    font-size: 10px;
+  }
+} 

@@ -4,14 +4,16 @@
     "start": "node dist/app.js",
     "dev": "ts-node src/app.ts",
     "check-env": "ts-node check-env.ts",
-    "test:watch": "jest --watch",
-    "test": "jest --config jest.config.ts",
-    "clean": "rm -rf dist/*"
-  },
+    "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
+    "test": "cross-env NODE_ENV=test jest --runInBand --forceExit",
+    "clean": "rm -rf dist/*",
+    "migrate": "ts-node src/db-migration.ts"
+     },
   "jest": {
     "verbose": true
   },
   "dependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
     "argon2": "0.41.1",
     "connect-pg-simple": "10.0.0",
     "cors": "^2.8.5",
@@ -23,6 +25,7 @@
     "express-session": "^1.18.1",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-google-oidc": "^0.1.0",
     "pg": "^8.14.1",

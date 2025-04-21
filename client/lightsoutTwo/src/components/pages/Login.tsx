@@ -6,31 +6,199 @@ import "./Login.css";
 const Login = () => {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Form state
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
+  // Check URL parameters for error
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    if (errorParam) {
+      setError(
+        errorParam === 'auth_failed' 
+          ? 'Authentication failed. Please try again.' 
+          : `Login error: ${errorParam}`
+      );
+    }
+  }, []);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    // Don't create a new controller on every render
     const controller = new AbortController();
+    let isActive = true; // Flag to track if effect is still active
 
     const checkAuth = async () => {
+      if (!isActive) return; // Don't proceed if no longer active
+      
       try {
+        setLoading(true);
+        setError(null); // Clear previous errors
+        
         const { data } = await apiClient.get("/auth/check", {
           signal: controller.signal,
           withCredentials: true,
+          // Add a shorter timeout just for the auth check
+          timeout: 5000
         });
 
-        if (data.authenticated) {
-          navigate("/profile", { replace: true });
+        // Only update state if component is still mounted
+        if (isActive) {
+          if (data.authenticated) {
+            navigate("/profile", { replace: true });
+          }
+          setLoading(false);
+          setAuthChecked(true);
         }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-      } finally {
-        setAuthChecked(true);
+      } catch (error: any) {
+        // Only update state if component is still mounted and error isn't from cancellation
+        if (isActive && error.name !== 'CanceledError' && error.code !== 'ERR_CANCELED') {
+          console.error("Auth check failed:", error);
+          
+          // Handle connection errors specially
+          if (error.isConnectionError) {
+            setError("Cannot connect to server. Please ensure the server is running at http://localhost:8000");
+          } else {
+            // Handle other errors
+            setError("Failed to check authentication status. Please try again later.");
+          }
+          setLoading(false);
+          setAuthChecked(true);
+        }
       }
     };
 
-    if (!authChecked) checkAuth();
+    // Only check auth if not already checked
+    if (!authChecked) {
+      checkAuth();
+    }
 
-    return () => controller.abort();
+    // Cleanup function
+    return () => {
+      isActive = false; // Mark effect as inactive
+      controller.abort(); // Abort any in-flight requests
+    };
   }, [navigate, authChecked]);
+
+  const handleGoogleLogin = () => {
+    setLoading(true);
+    // The redirect will happen via the href
+  };
+
+  const handleLocalLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setLoading(true);
+    
+    if (!email) {
+      setFormError("Email is required");
+      setLoading(false);
+      return;
+    }
+    
+    if (!password) {
+      setFormError("Password is required");
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const response = await apiClient.post("/auth/login", {
+        email,
+        password
+      });
+      
+      if (response.status === 200) {
+        navigate("/profile");
+      }
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      
+      // More detailed error reporting
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        console.error("Response headers:", error.response.headers);
+        setFormError(error.response.data.message || "Login failed. Please check your credentials.");
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        setFormError("No response from server. Please try again later.");
+      } else {
+        console.error("Error during request setup:", error.message);
+        setFormError("Error setting up request. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    
+    if (!email) {
+      setFormError("Email is required");
+      return;
+    }
+    
+    if (!password) {
+      setFormError("Password is required");
+      return;
+    }
+    
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      setFormError("Passwords do not match");
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Create registration payload
+      const payload = {
+        email: email,
+        password: password,
+        display_name: email.split('@')[0]
+      };
+      
+      console.log("Sending registration payload:", JSON.stringify(payload));
+      
+      const response = await apiClient.post("/auth/register", payload);
+      
+      console.log("Registration response:", response);
+      
+      if (response.status === 201) {
+        // No need to login separately - server already logs us in
+        navigate("/profile");
+      }
+    } catch (error: any) {
+      console.error("Registration failed:", error);
+      
+      // More detailed error reporting
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+        console.error("Response headers:", error.response.headers);
+        setFormError(error.response.data.message || "Registration failed. Please try again.");
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        setFormError("No response from server. Please try again later.");
+      } else {
+        console.error("Error during request setup:", error.message);
+        setFormError("Error setting up request. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="login-container">
@@ -44,10 +212,124 @@ const Login = () => {
           <p className="subtext">Please sign in to continue</p>
         </div>
 
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+        
+        {/* Tab navigation */}
+        <div className="auth-tabs">
+          <button 
+            className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
+            onClick={() => setActiveTab('login')}>
+            Login
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'register' ? 'active' : ''}`}
+            onClick={() => setActiveTab('register')}>
+            Register
+          </button>
+        </div>
+        
+        {/* Form error message */}
+        {formError && (
+          <div className="error-message">
+            {formError}
+          </div>
+        )}
+        
+        {/* Login Form */}
+        {activeTab === 'login' && (
+          <form onSubmit={handleLocalLogin} className="auth-form">
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="submit-button"
+              disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        )}
+        
+        {/* Register Form */}
+        {activeTab === 'register' && (
+          <form onSubmit={handleRegister} className="auth-form">
+            <div className="form-group">
+              <label htmlFor="reg-email">Email</label>
+              <input
+                type="email"
+                id="reg-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="reg-password">Password</label>
+              <input
+                type="password"
+                id="reg-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="confirm-password">Confirm Password</label>
+              <input
+                type="password"
+                id="confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="submit-button"
+              disabled={loading}>
+              {loading ? 'Registering...' : 'Register'}
+            </button>
+          </form>
+        )}
+
+        <div className="divider">
+          <span>OR</span>
+        </div>
+
         <div className="oauth-providers">
           <a
             href="http://localhost:8000/auth/google"
             className="provider-button google"
+            onClick={handleGoogleLogin}
+            aria-disabled={loading}
           >
             <svg className="provider-icon" viewBox="0 0 24 24">
               <path
@@ -67,18 +349,8 @@ const Login = () => {
                 fill="#EA4335"
               />
             </svg>
-            Continue with Google
+            {loading ? 'Please wait...' : 'Continue with Google'}
           </a>
-        </div>
-
-        <div className="divider">
-          <span>OR</span>
-        </div>
-
-        <div className="footer">
-          <p>
-            Don't have an account? <a href="#">Sign up</a>
-          </p>
         </div>
       </div>
     </div>

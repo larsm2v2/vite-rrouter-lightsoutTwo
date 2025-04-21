@@ -12,6 +12,7 @@ import pool from "./config/database";
 import { initializeDatabase } from "./config/schema";
 import helmet from "helmet";
 import authRoutes from "./routes/auth.routes";
+import puzzleRoutes from "./routes/puzzles.routes";
 import rateLimit from "express-rate-limit";
 import csrf from "csrf-csrf";
 import { param } from "express-validator";
@@ -36,7 +37,23 @@ requiredEnvVars.forEach((varName) => {
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL, // Your frontend URL
+    origin: function(origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        process.env.CLIENT_URL, 
+        'http://localhost:5173',
+        'http://localhost:5174'
+      ];
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.log(`Origin ${origin} not allowed by CORS`);
+        callback(null, false);
+      }
+    },
     credentials: true, // Required for cookies/sessions
     methods: ["GET", "POST", "OPTIONS"],
     exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
@@ -53,10 +70,25 @@ app.use(
   })
 );
 app.use(express.json());
+// Add URL-encoded middleware to handle form data
+app.use(express.urlencoded({ extended: true }));
 
 app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Add request logger middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
+// Mount auth routes
+app.use("/auth", authRoutes);
+
+// Mount puzzle routes
+app.use("/puzzles", puzzleRoutes);
 
 // Google OAuth Configuration
 const GOOGLE_OAUTH_URL = process.env.GOOGLE_OAUTH_URL;
@@ -73,6 +105,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // Hook into response finish to log the outcome
   res.on("finish", async () => {
     try {
+      // Skip audit logging for test routes
+      if (process.env.NODE_ENV === "test" && req.path.startsWith("/test/")) {
+        return;
+      }
+
       await pool.query(
         `INSERT INTO audit_log (
           user_id, action, endpoint, ip_address, 
@@ -93,10 +130,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         ]
       );
     } catch (err) {
-      console.error(
-        "Audit log failed:",
-        err instanceof Error ? err.message : String(err)
-      );
+      // Only log errors in non-test environment
+      if (process.env.NODE_ENV !== "test") {
+        console.error(
+          "Audit log failed:",
+          err instanceof Error ? err.message : String(err)
+        );
+      }
     }
   });
 
@@ -105,33 +145,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.get("/", (req: Request, res: Response) => {
   res.redirect(process.env.CLIENT_URL + "/login");
 });
-// Redirect to Google OAuth Consent Screen
-app.get("/auth/google", async (req: Request, res: Response) => {
-  const state = crypto.randomBytes(16).toString("hex");
-  req.session.state = state; // Save state to session
-  const scopes = GOOGLE_OAUTH_SCOPES.join(" ");
-  const GOOGLE_OAUTH_CONSENT_SCREEN_URL = `${GOOGLE_OAUTH_URL}?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${GOOGLE_CALLBACK_URL}&access_type=offline&response_type=code&state=${state}&scope=${scopes}`;
-  res.redirect(GOOGLE_OAUTH_CONSENT_SCREEN_URL);
-});
-
-// Google OAuth Callback Route
-app.get(
-  "/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: process.env.CLIENT_URL + "/login",
-    successRedirect: process.env.CLIENT_URL + "/profile",
-    failureMessage: true,
-  }),
-  (req, res) => {
-    // Successful authentication, redirect to profile
-    res.redirect(process.env.CLIENT_URL + "/profile");
-  }
-);
 
 // Protected routes
 app.get("/profile", async (req, res) => {
-  // if (!req.user) return res.redirect("/login");
-  // res.json(req.user);
+  // For tests, add debug logging
+  if (process.env.NODE_ENV === 'test') {
+    console.log("Profile request:", {
+      hasUser: !!req.user,
+      user: req.user,
+      sessionID: req.sessionID,
+      hasSession: !!req.session,
+    });
+  }
+  
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
 
   try {
@@ -144,17 +170,32 @@ app.get("/profile", async (req, res) => {
 
     // Get game stats
     const statsResult = await pool.query(
-      `SELECT current_level, buttons_pressed, saved_maps
+      `SELECT current_level, best_combination, saved_maps
        FROM game_stats WHERE user_id = $1`,
       [req.user.id]
     );
 
+    // Base stats (ensure defaults)
+    const baseStats = statsResult.rows[0] || {
+      current_level: 1,
+      best_combination: [],
+      saved_maps: [],
+    };
+
+    // Fetch minimum moves for all classic levels
+    const { rows: minMovesRows } = await pool.query(
+      `SELECT level, min_moves FROM classic_puzzles WHERE difficulty = '' OR difficulty = 'classic'`
+    );
+    const minMovesMap: { [level: number]: number } = {};
+    minMovesRows.forEach((row: any) => {
+      minMovesMap[row.level] = row.min_moves;
+    });
+
     res.json({
       user: userResult.rows[0],
-      stats: statsResult.rows[0] || {
-        current_level: 1,
-        buttons_pressed: [],
-        saved_maps: [],
+      stats: {
+        ...baseStats,
+        min_moves: minMovesMap,
       },
     });
   } catch (err) {
@@ -244,10 +285,148 @@ app.post("/auth/logout", (req: Request, res: Response) => {
   });
 });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal Server Error" });
+app.post("/game/progress", async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const { level, moves, completed } = req.body;
+    
+    // Validate input
+    if (!level || typeof level !== 'number') {
+      return res.status(400).json({ error: "Invalid level" });
+    }
+    
+    // First, get the current level
+    const userStatsResult = await pool.query(
+      `SELECT current_level, best_combination 
+       FROM game_stats WHERE user_id = $1`,
+      [req.user.id]
+    );
+    
+    const userStats = userStatsResult.rows[0];
+    const currentLevel = userStats?.current_level || 1;
+    
+    // Only update level if the completed level is the current one
+    // and we're moving to the next level
+    let newLevel = currentLevel;
+    if (completed && level === currentLevel) {
+      newLevel = currentLevel + 1;
+    }
+    
+    // Store the moves as best combination if better than current
+    // or if no best combination exists for this level
+    let bestCombination = userStats?.best_combination || [];
+    if (Array.isArray(bestCombination)) {
+      // If this level doesn't have a best combination yet or new moves is better
+      if (!bestCombination[level - 1] || moves < bestCombination[level - 1]) {
+        // Create a copy of the array with the right length
+        const newBestCombination = [...bestCombination];
+        // Make sure the array is long enough
+        while (newBestCombination.length < level) {
+          newBestCombination.push(null);
+        }
+        // Set the new best for this level
+        newBestCombination[level - 1] = moves;
+        bestCombination = newBestCombination;
+      }
+    }
+    
+    // Update the database
+    await pool.query(
+      `UPDATE game_stats
+       SET current_level = $1, best_combination = $2
+       WHERE user_id = $3`,
+      [newLevel, JSON.stringify(bestCombination), req.user.id]
+    );
+    
+    res.json({ 
+      success: true,
+      current_level: newLevel,
+      best_combination: bestCombination
+    });
+  } catch (err) {
+    console.error("Game progress update error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
 });
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  // Log the error with stack trace
+  console.error('Server error:', err);
+  console.error('Error stack:', err.stack);
+  
+  // For OAuth errors, add more detailed logging
+  if (req.path.includes('/auth/google') || req.path.includes('/callback')) {
+    console.error('OAuth error details:', {
+      path: req.path,
+      method: req.method,
+      query: req.query,
+      session: req.session ? 'Session exists' : 'No session',
+      user: req.user ? 'User exists' : 'No user',
+    });
+  }
+  
+  // Don't expose error details in production
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(500).json({ error: "Internal Server Error" });
+  } else {
+    // In development, return the error details
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: err.message,
+      stack: err.stack,
+    });
+  }
+});
+
+// Initialize database for tests
+if (process.env.NODE_ENV === 'test') {
+  initializeDatabase()
+    .then(() => console.log("✅ Test database initialized"))
+    .catch(err => console.error("❌ Test database initialization failed:", err));
+}
+
+// Test routes - only available in test environment
+if (process.env.NODE_ENV === 'test') {
+  app.post("/test/mock-login", (req: Request, res: Response, next: NextFunction) => {
+    console.log("Mock login request:", {
+      userId: req.body.userId,
+      sessionID: req.sessionID,
+    });
+    
+    // Create test user object
+    const testUser = {
+      id: req.body.userId,
+      email: "test@example.com",
+      display_name: "Test User",
+    };
+    
+    // Login with the test user
+    req.login(testUser, { session: true }, (err) => {
+      if (err) {
+        console.error("Login error:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      
+      // Save the session
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: err.message });
+        }
+        
+        console.log("Login successful:", {
+          user: req.user,
+          sessionID: req.sessionID,
+          sessionCookie: req.sessionID && res.getHeader('set-cookie'),
+        });
+        
+        // Return success with the cookie
+        return res.status(200).json({ success: true });
+      });
+    });
+  });
+}
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -275,19 +454,4 @@ if (process.env.NODE_ENV !== "test") {
   startServer(); // Only start server when not testing
 }
 
-if (process.env.NODE_ENV === "test") {
-  app.post("/test/mock-login", async (req, res) => {
-    // Create a minimal valid User object
-    const mockUser: Express.User = {
-      id: req.body.userId,
-      email: "test@example.com",
-      display_name: "Test User",
-    };
-
-    req.logIn(mockUser, (err) => {
-      if (err) return res.status(500).send(err);
-      res.send("OK");
-    });
-  });
-}
 export default app;
