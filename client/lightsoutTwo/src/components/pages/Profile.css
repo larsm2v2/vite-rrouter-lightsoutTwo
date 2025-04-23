@@ -257,7 +257,25 @@
 .stat-card p {
   color: #f9fafb;
 }
-
+.pagination-button {
+  background-color: #000000;
+  color: #f9fafb;
+  border: none;
+  padding: 0.2rem 0.2rem 0.2rem 0.2rem;
+  border-radius: 0.375rem;
+  margin: 0.5rem 0.5rem 0.5rem 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pagination-button:hover {
+  background-color: #f3f3f3;
+  color: #000000;
+}
+.pagination-button:disabled {
+  background-color: #555555;
+  color: #777777;
+  cursor: default;
+}
 .action-button.primary,
 .action-button.secondary,
 .action-button.create {
@@ -272,4 +290,56 @@
 }
 .saved-maps-button:hover {
   background-color: #333333;
+}
+
+/* Level grid styles */
+.level-grid-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #333333;
+  padding: 1rem;
+  border-radius: 0.375rem;
+  color: #f9fafb;
+}
+.level-grid-container h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+}
+.levels-grid {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  grid-template-columns: repeat(5, 1fr);
+}
+.level-light {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  transition: transform 0.15s ease;
+}
+.level-light.locked {
+  background-color: #555555;
+  color: #777777;
+  cursor: default;
+}
+.level-light.completed {
+  background-color: #ff4081; /* pink */
+  color: #ffffff;
+  cursor: pointer;
+}
+.level-light.perfect {
+  background-color: #ffeb3b; /* yellow */
+  color: #000000;
+  box-shadow: 0 0 6px #ffeb3b;
+  cursor: pointer;
+}
+.level-light.completed:hover,
+.level-light.perfect:hover {
+  transform: scale(1.1);
 }

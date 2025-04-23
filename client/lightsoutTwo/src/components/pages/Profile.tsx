@@ -23,6 +23,9 @@ const Profile = () => {
   const [stats, setStats] = useState<GameStats | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  // Levels pagination
+  const levelsPerPage = 25;
+  const [page, setPage] = useState<number>(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -70,12 +73,29 @@ const Profile = () => {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (stats) {
+      const startIdx = (stats.current_level || 1) - 1;
+      setPage(Math.floor(startIdx / levelsPerPage));
+    }
+  }, [stats]);
+
   const handleLogout = async () => {
     try {
       await apiClient.post("/auth/logout");
       navigate("/login");
     } catch (error) {
       console.error("Logout failed:", error);
+    }
+  };
+
+  // New helper to wipe server stats then start at level 1
+  const handleNewGame = async () => {
+    try {
+      await apiClient.post("/profile/reset-stats");
+      navigate("/game/1", { state: { level: 1 } });
+    } catch (error) {
+      console.error("Failed to reset game stats:", error);
     }
   };
 
@@ -95,12 +115,13 @@ const Profile = () => {
   // Calculate progress percent with base and bonuses
   const calculateProgress = (): string => {
     if (!stats) return '0%';
-    // Fallback to original level-based if no min_moves data
-    if (!stats.min_moves) {
-      return `${Math.min(100, ((stats.current_level || 1) / 25) * 100)}%`;
+    const bestComb = stats.best_combination ?? [];
+    // Fallback to original level-based if no min_moves data or no best_combination
+    if (!stats.min_moves || bestComb.length === 0) {
+      return `${Math.min(100, ((stats.current_level || 1) / 50) * 100)}%`;
     }
     let percent = 0;
-    stats.best_combination.forEach((moves, idx) => {
+    bestComb.forEach((moves, idx) => {
       if (moves != null && moves > 0) {
         const level = idx + 1;
         // 1% for completion
@@ -108,20 +129,29 @@ const Profile = () => {
         const minMove = stats.min_moves?.[level];
         if (minMove != null) {
           const diff = moves - minMove;
-          if (diff === 0) percent += 3;
-          else if (diff <= 2) percent += 2;
-          else if (diff <= 4) percent += 1;
+          if (diff === 0) percent += 1;
         }
       }
     });
     return `${Math.min(percent, 100)}%`;
   };
 
-  if (loading) {
+  if (loading || !stats) {
     return <div className="loading">Loading profile...</div>;
   }
 
+  // Ensure best_combination and min_moves are not null
+  const bestComb: number[] = stats.best_combination || [];
+  const minMovesMap = stats.min_moves || {};
+
   const lastFiveLevels = getLastFiveCompletedLevels();
+  // Determine grid dimensions and total levels
+  const totalLevels = Object.keys(minMovesMap).length || bestComb.length || 25;
+  // Compute pagination slices
+  const totalPages = Math.ceil(totalLevels / levelsPerPage);
+  const levelsArray = Array.from({ length: totalLevels }, (_, i) => i + 1);
+  const levelsToShow = levelsArray.slice(page * levelsPerPage, (page + 1) * levelsPerPage);
+  const gridSize = Math.sqrt(totalLevels);
 
   return (
     <div className="profile-container">
@@ -145,11 +175,47 @@ const Profile = () => {
               value={stats?.current_level || 1}
               icon="🏆"
             />
-            <StatCard
-              title="Completed Levels"
-              value={lastFiveLevels.length}
-              icon="🎮"
-            />
+            <div className="level-grid-container">
+              <h3>Classic Levels (5x5)</h3>
+              <div className="pagination-controls">
+                <button className="pagination-button" disabled={page === 0} onClick={() => setPage(page - 1)}>Prev</button>
+                <span>Page {page + 1}/{totalPages}</span>
+                <button className="pagination-button" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
+              </div>
+              <div
+                className="levels-grid"
+                style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
+              >
+                {levelsToShow.map(level => {
+                  const idx = level - 1;
+                  const moves = bestComb[idx];
+                  const minMove = minMovesMap[level];
+                  const currentToPlay = stats.current_level || 1;
+                  // Determine status: locked, completed, perfect, or next
+                  let levelStatus: 'locked' | 'completed' | 'perfect' | 'next' = 'locked';
+                  if (moves != null && moves > 0) levelStatus = 'completed';
+                  if (moves != null && minMove != null && moves === minMove) {
+                    levelStatus = 'perfect';
+                  }
+                  if (levelStatus === 'locked' && level === currentToPlay) levelStatus = 'next';
+                  const clickable = levelStatus !== 'locked';
+                  return (
+                    <button
+                      key={level}
+                      className={`level-light ${levelStatus}`}
+                      disabled={!clickable}
+                      onClick={
+                        clickable
+                          ? () => navigate(`/game/${level}`, { state: { level } })
+                          : undefined
+                      }
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <button
               className="stat-card saved-maps-button"
               onClick={() => navigate('/saved-maps')}
@@ -195,7 +261,7 @@ const Profile = () => {
           )}
         </div>
 
-        <div className="saved-maps-section">
+        {/* <div className="saved-maps-section">
           <h2>Saved Maps</h2>
           {stats?.saved_maps?.length ? (
             <div className="saved-maps-grid">
@@ -210,7 +276,7 @@ const Profile = () => {
           ) : (
             <p>No saved maps yet.</p>
           )}
-        </div>
+        </div> */}
 
         <div className="game-actions">
           <button 
@@ -223,7 +289,7 @@ const Profile = () => {
           </button>
           <button 
             className="action-button secondary"
-            onClick={() => navigate('/game/1', { state: { level: 1 }})}
+            onClick={handleNewGame}
           >
             New Game
           </button>

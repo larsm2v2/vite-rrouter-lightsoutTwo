@@ -1,7 +1,6 @@
 // src/schema.ts
 import pool from "./database";
-import createClassicPuzzlesTable from "../migrations/create_classic_puzzles";
-import migrateCustomPuzzles from "../migrations/create_custom_puzzles";
+import migrateClassicPuzzles from "../migrations/create_classic_puzzles";
 
 // Add a lock to prevent concurrent initialization
 let isInitializing = false;
@@ -83,9 +82,10 @@ async function createTables() {
         difficulty TEXT NOT NULL,
         level INTEGER NOT NULL,
         pattern INTEGER[] NOT NULL,
+        min_moves INTEGER,
+        grid_size INTEGER,
         created_at TIMESTAMP DEFAULT NOW(),
         created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        min_moves INTEGER,
         UNIQUE(difficulty, level)
       );
     `);
@@ -122,11 +122,8 @@ export async function initializeDatabase() {
         isInitializing = false;
       });
     
-    // Create classic_puzzles table first
-    await createClassicPuzzlesTable();
-    
-    // Then replace with custom puzzles
-    await migrateCustomPuzzles();
+    // Then replace with classic puzzles
+    await migrateClassicPuzzles();
     
     console.log("Database schema initialization completed successfully");
   } catch (error) {

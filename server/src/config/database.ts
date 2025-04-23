@@ -1,4 +1,6 @@
 // src/database.ts
+import dotenv from 'dotenv';
+dotenv.config(); 
 import { Pool } from "pg";
 import { env } from "process";
 import { testPool } from "./test-config";
@@ -20,18 +22,18 @@ const pgConfig =
         user: env.PG_USER || "postgres",
         host: process.env.PG_HOST_TEST || "localhost",
         database: process.env.PG_DATABASE_TEST || "ttlo_test",
-        password: env.PG_PASSWORD || "your_password",
+        password: process.env.PG_PASSWORD || "your_password",
         port: parseInt(env.PG_PORT || "5432"),
         max: 20, // max number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
       }
     : {
-        user: env.PG_USER || "postgres",
-        host: env.PG_HOST || "localhost",
-        database: env.PG_DATABASE || "TTLO",
-        password: env.PG_PASSWORD || "your_password",
-        port: parseInt(env.PG_PORT || "5432"),
+        user: process.env.PG_USER || "postgres",
+        host: process.env.PG_HOST || "localhost",
+        database: process.env.PG_DATABASE || "TTLO",
+        password: process.env.PG_PASSWORD || "your_password",
+        port: parseInt(process.env.PG_PORT || "5432"),
         max: 20, // max number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,

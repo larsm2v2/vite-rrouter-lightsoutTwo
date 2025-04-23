@@ -12,19 +12,23 @@ const CreatePuzzle = () => {
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [solution, setSolution] = useState<number | null>(null);
+  const [toggleAdjacent, setToggleAdjacent] = useState<boolean>(false);
 
   // Handle cell click to toggle the light on/off
   const handleCellClick = (row: number, col: number) => {
-    // Create a deep copy of the current grid
-    const newGrid = JSON.parse(JSON.stringify(grid));
-    
-    // Simply toggle this cell (no adjacency toggling)
+    // Copy grid
+    const newGrid = grid.map(r => [...r]);
+    // Toggle clicked cell
     newGrid[row][col] = !newGrid[row][col];
-    
-    // Update the grid state
+    // Toggle neighbors if enabled
+    if (toggleAdjacent) {
+      if (row > 0) newGrid[row - 1][col] = !newGrid[row - 1][col];
+      if (row < gridSize - 1) newGrid[row + 1][col] = !newGrid[row + 1][col];
+      if (col > 0) newGrid[row][col - 1] = !newGrid[row][col - 1];
+      if (col < gridSize - 1) newGrid[row][col + 1] = !newGrid[row][col + 1];
+    }
+    // Commit changes
     setGrid(newGrid);
-    
-    // Reset validation when grid changes
     setValidationError(null);
     setSolution(null);
   };
@@ -165,16 +169,29 @@ const CreatePuzzle = () => {
             ❌ {validationError}
           </div>
         )}
-        
         <div className="button-group">
-          <button 
+        <button 
             className="action-button validate"
             onClick={validatePuzzle}
             disabled={isValidating}
           >
             {isValidating ? "Validating..." : "Validate Puzzle"}
           </button>
-
+          <button 
+            className="action-button save"
+            onClick={savePuzzle}
+            disabled={solution === null}
+          >
+            Save Puzzle
+          </button>
+        </div>
+        <div className="button-group">
+        <button 
+            className="action-button toggle-adjacent"
+            onClick={() => setToggleAdjacent(!toggleAdjacent)}
+          >
+            {toggleAdjacent ? "Adjacent Enabled" : "Adjacent Disabled"}
+          </button>
           {allOn ? (
             <button
               className="action-button all-on"
@@ -198,15 +215,6 @@ const CreatePuzzle = () => {
               </button>
             </>
           )}
-
-          <button 
-            className="action-button save"
-            onClick={savePuzzle}
-            disabled={solution === null}
-          >
-            Save Puzzle
-          </button>
-          
           <button 
             className="action-button cancel"
             onClick={() => navigate("/profile")}

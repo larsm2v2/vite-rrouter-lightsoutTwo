@@ -144,8 +144,30 @@ passport.use(
 
           user = newUserResult.rows[0];
           console.log("Created new user:", user);
+          // Create default game_stats for the new user so stats persist
+          await dbPool.query(
+            `INSERT INTO game_stats (user_id) VALUES ($1)`,
+            [user.id]
+          );
+          console.log(`Initialized game_stats for user ${user.id}`);
         } else {
           console.log("Found existing user:", user);
+          // Ensure game_stats exists for this user
+          try {
+            const statsCheck = await dbPool.query(
+              `SELECT 1 FROM game_stats WHERE user_id = $1`,
+              [user.id]
+            );
+            if (statsCheck.rows.length === 0) {
+              await dbPool.query(
+                `INSERT INTO game_stats (user_id) VALUES ($1)`,
+                [user.id]
+              );
+              console.log(`Initialized game_stats for existing user ${user.id}`);
+            }
+          } catch (statsErr) {
+            console.error('Error ensuring game_stats for user', user.id, statsErr);
+          }
         }
 
         return done(null, user);

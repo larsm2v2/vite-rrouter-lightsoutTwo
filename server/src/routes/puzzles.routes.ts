@@ -48,7 +48,24 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.get('/:difficulty', async (req: Request, res: Response) => {
   const { difficulty } = req.params;
-  const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', 'custom', ''];
+  // Handle custom puzzles via saved_maps in game_stats
+  if (difficulty === 'custom') {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const { rows } = await pool.query(
+        `SELECT saved_maps FROM game_stats WHERE user_id = $1`,
+        [req.user.id]
+      );
+      const saved: any[] = rows[0]?.saved_maps || [];
+      const result: { [key: string]: number[] } = {};
+      saved.forEach(m => result[`level${m.level}`] = m.pattern);
+      return res.json(result);
+    } catch (err) {
+      console.error('Error fetching custom puzzles:', err);
+      return res.status(500).json({ error: 'Failed to fetch custom puzzles' });
+    }
+  }
+  const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', ''];
   
   // Handle empty difficulty parameter
   const difficultyParam = difficulty === '%20' || difficulty === ' ' ? '' : difficulty;
@@ -59,6 +76,7 @@ router.get('/:difficulty', async (req: Request, res: Response) => {
   }
   
   try {
+    // Classic puzzles
     const { rows } = await pool.query(
       `SELECT level, pattern FROM classic_puzzles WHERE difficulty = $1 ORDER BY level`,
       [difficultyParam]
@@ -83,7 +101,23 @@ router.get('/:difficulty', async (req: Request, res: Response) => {
  */
 router.get('/:difficulty/:level', async (req: Request, res: Response) => {
   const { difficulty, level } = req.params;
-  const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', 'custom', ''];
+  // Custom single puzzle
+  if (difficulty === 'custom') {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const levelNumber = parseInt(level.replace('level',''));
+    const { rows } = await pool.query(
+      `SELECT saved_maps FROM game_stats WHERE user_id=$1`,
+      [req.user.id]
+    );
+    const saved: any[] = rows[0]?.saved_maps || [];
+    const found = saved.find(m => m.level === levelNumber);
+    if (!found) {
+      return res.status(404).json({ error: 'Custom puzzle not found' });
+    }
+    // Return full object with pattern, minMoves, gridSize
+    return res.json(found);
+  }
+  const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', ''];
   // Handle empty difficulty parameter
   const difficultyParam = difficulty === '%20' || difficulty === ' ' ? '' : difficulty;
   
@@ -165,33 +199,22 @@ router.post('/create', async (req: Request, res: Response) => {
   }
   
   try {
-    // Find the next available level number for custom puzzles
+    // Find the next available custom level
     const { rows: levelRows } = await pool.query(
-      `SELECT MAX(level) as max_level FROM classic_puzzles WHERE difficulty = 'custom'`
+      `SELECT MAX((item->>'level')::int) AS max_level FROM (
+         SELECT jsonb_array_elements(saved_maps) AS item
+         FROM game_stats WHERE user_id = $1
+       ) AS sub`,
+      [req.user.id]
     );
-    
     const nextLevel = levelRows[0]?.max_level ? parseInt(levelRows[0].max_level) + 1 : 1;
     
-    // Insert the new puzzle
+    // Append new custom puzzle entry with minMoves and gridSize
     await pool.query(
-      `INSERT INTO classic_puzzles (difficulty, level, pattern, created_by, min_moves)
-       VALUES ($1, $2, $3, $4, $5)`,
-      ['custom', nextLevel, pattern, req.user.id, minimumMoves]
-    );
-    
-    // Also add to the user's saved maps
-    await pool.query(
-      `WITH user_stats AS (
-         SELECT saved_maps FROM game_stats WHERE user_id = $1
-       )
-       UPDATE game_stats 
-       SET saved_maps = CASE 
-         WHEN user_stats.saved_maps IS NULL THEN jsonb_build_array($2::jsonb)
-         ELSE user_stats.saved_maps || jsonb_build_array($2::jsonb)
-       END
-       FROM user_stats
+      `UPDATE game_stats
+         SET saved_maps = COALESCE(saved_maps, '[]'::jsonb) || to_jsonb($2)
        WHERE user_id = $1`,
-      [req.user.id, JSON.stringify({ level: nextLevel, pattern, minimumMoves })]
+      [req.user.id, { level: nextLevel, pattern, minMoves: minimumMoves, gridSize: 5 }]
     );
     
     // Fetch updated saved_maps for the user
@@ -204,7 +227,8 @@ router.post('/create', async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       level: nextLevel,
-      difficulty: 'custom',
+      difficulty: 'custom', 
+      gridSize: 5,
       saved_maps: updatedSavedMaps
     });
   } catch (err) {

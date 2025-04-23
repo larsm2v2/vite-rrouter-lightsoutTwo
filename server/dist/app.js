@@ -26,6 +26,7 @@ const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const puzzles_routes_1 = __importDefault(require("./routes/puzzles.routes"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const express_validator_1 = require("express-validator");
+const profile_1 = __importDefault(require("./routes/profile"));
 const app = (0, express_1.default)();
 const requiredEnvVars = [
     "SESSION_SECRET",
@@ -87,6 +88,8 @@ app.use((req, res, next) => {
 app.use("/auth", auth_routes_1.default);
 // Mount puzzle routes
 app.use("/puzzles", puzzles_routes_1.default);
+// Mount profile routes
+app.use("/profile", profile_1.default);
 // Google OAuth Configuration
 const GOOGLE_OAUTH_URL = process.env.GOOGLE_OAUTH_URL;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;

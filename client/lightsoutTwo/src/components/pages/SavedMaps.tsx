@@ -17,6 +17,19 @@ const SavedMaps = () => {
   const [selectedMap, setSelectedMap] = useState<SavedMap | null>(null);
   const navigate = useNavigate();
 
+  // Delete the currently selected saved map
+  const handleDelete = async () => {
+    if (!selectedMap) return;
+    try {
+      await apiClient.delete(`/profile/saved-maps/${selectedMap.level}`, { withCredentials: true });
+      setMaps(maps.filter(m => m.level !== selectedMap.level));
+      setSelectedMap(null);
+    } catch (err: any) {
+      console.error('Failed to delete saved map:', err);
+      setError('Failed to delete puzzle');
+    }
+  };
+
   useEffect(() => {
     const fetchSavedMaps = async () => {
       try {
@@ -68,6 +81,13 @@ const SavedMaps = () => {
               onClick={() => selectedMap && navigate(`/game/custom/${selectedMap.level}`)}
             >
               Play Selected Puzzle
+            </button>
+            <button
+              className="delete-button"
+              disabled={!selectedMap}
+              onClick={handleDelete}
+            >
+              Delete Puzzle
             </button>
           </div>
         </>

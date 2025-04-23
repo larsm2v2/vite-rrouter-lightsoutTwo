@@ -4,7 +4,7 @@ import apiClient from "./Client";
 import "./Game.css";
 import "../Light/Light.css";
 // Import patterns for legacy support
-import patternsData from "../Light/Patterns.json";
+import { gridToPattern, arePatternsEqual } from "../../utils/puzzleChecker";
 
 interface GameProps {
   // If you want to pass props directly instead of using URL params
@@ -29,26 +29,22 @@ const legacyPatterns: LevelPatternsType = {
   // Add more patterns as needed
 };
 
-// Legacy support for imported patterns
-const importedPatterns = patternsData.patterns as ImportedPatternsType;
-for (const level in importedPatterns) {
-  const levelNum = parseInt(level);
-  if (!legacyPatterns[levelNum]) {
-    // Only add if we don't already have this level defined
-    legacyPatterns[levelNum] = importedPatterns[level].filter(
-      (item: any) => !Array.isArray(item)
-    ) as number[];
-  }
-}
 
-type GameMode = "classic" | "random";
-type Difficulty = "easy" | "medium" | "hard" | "expert";
+type GameMode = "classic" | "random" | "custom";
 
 const Game = (props: GameProps) => {
   const { level } = useParams<{ level: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const isCustomRoute = location.pathname.startsWith("/game/custom");
+  // Determine mode from URL on mount: custom if path starts with /game/custom
+  const initialCustom = location.pathname.startsWith("/game/custom");
+  const [gameMode, setGameMode] = useState<GameMode>(initialCustom ? "custom" : "classic");
+  // Ensure gameMode flips to custom when URL changes
+  useEffect(() => {
+    if (location.pathname.startsWith("/game/custom")) {
+      setGameMode("custom");
+    }
+  }, [location.pathname]);
   const [currentLevel, setCurrentLevel] = useState<number>(1);
   const [gridSize, setGridSize] = useState<number>(5); // Default to 5x5
   const [grid, setGrid] = useState<boolean[][]>([]);
@@ -57,17 +53,16 @@ const Game = (props: GameProps) => {
   // Store initial grid state for resetting
   const [initialGrid, setInitialGrid] = useState<boolean[][]>([]);
   const [showIndices, setShowIndices] = useState<boolean>(false); // Show position indices by default
-  const [gameMode, setGameMode] = useState<GameMode>("classic"); // Default to classic levels
-  const [difficulty, setDifficulty] = useState<Difficulty>("easy"); // Default difficulty
   
   // State to store fetched patterns
   const [classicPatterns, setClassicPatterns] = useState<{ [key: number]: number[] }>({});
   const [isLoadingPatterns, setIsLoadingPatterns] = useState<boolean>(false);
   const [patternError, setPatternError] = useState<string | null>(null);
+  // Track minimum moves for random puzzles
+  const [minMoves, setMinMoves] = useState<number | null>(null);
 
-  // Fetch patterns when difficulty changes
+  // Fetch patterns only when in classic mode
   useEffect(() => {
-    // Only fetch patterns for classic mode
     if (gameMode !== "classic") return;
     
     const fetchPatterns = async () => {
@@ -117,12 +112,12 @@ const Game = (props: GameProps) => {
           const levelNum = parseInt(levelKey.replace('level', ''));
           if (!isNaN(levelNum)) {
             patterns[levelNum] = pattern as number[];
-            console.log(`Added pattern for level ${levelNum}:`, patterns[levelNum]);
+            
           }
         }
         
         setClassicPatterns(patterns);
-        console.log('Final loaded patterns:', patterns);
+ 
       } catch (error) {
         console.error("Failed to fetch patterns:", error);
         setPatternError("Failed to load puzzle patterns");
@@ -132,7 +127,7 @@ const Game = (props: GameProps) => {
     };
     
     fetchPatterns();
-  }, [gameMode]); // Only depends on gameMode now, not difficulty
+  }, [gameMode]);
 
   // Memoize the toggleCell function first since it's used by setupPuzzle
   const toggleCell = useCallback((currentGrid: boolean[][], row: number, col: number, countMove: boolean = true) => {
@@ -238,7 +233,7 @@ const Game = (props: GameProps) => {
           
           // Only toggle if within grid bounds
           if (row >= 0 && row < size && col >= 0 && col < size) {
-            toggleCell(newGrid, row, col, false);
+            newGrid[row][col] = true;
           }
         });
         return;
@@ -252,6 +247,7 @@ const Game = (props: GameProps) => {
 
   // Initialize game depends on setupPuzzle
   const initializeGame = useCallback((size: number, gameLevel: number) => {
+    console.log('initializeGame start:', { size, gameLevel, serverPattern: classicPatterns[gameLevel] });
     // Create a new grid
     const newGrid: boolean[][] = Array(size).fill(false).map(() => 
       Array(size).fill(false)
@@ -259,6 +255,7 @@ const Game = (props: GameProps) => {
     
     // Set up the puzzle based on level
     setupPuzzle(newGrid, gameLevel);
+    console.log('initializeGame, newGrid after setup:', newGrid);
     
     // Reset game state
     setGrid(newGrid);
@@ -268,22 +265,39 @@ const Game = (props: GameProps) => {
     setInitialGrid(JSON.parse(JSON.stringify(newGrid)));
   }, [setupPuzzle]);
 
-  // Custom puzzle loader: fetch and set grid when on custom route
+  // Custom puzzle loader: fetch and set grid when in custom mode
   useEffect(() => {
-    if (!isCustomRoute) return;
+    console.log("Game mode:", gameMode);
+    if (gameMode !== "custom") return;
     let isMounted = true;
     setIsLoadingPatterns(true);
     apiClient.get(`/puzzles/custom/${level}`)
       .then(res => {
         if (!isMounted) return;
-        const pattern: number[] = res.data;
+      
+        const { pattern, gridSize: customSize = 5 } = res.data as {
+          level: number;
+          pattern: number[];
+          minMoves: number;
+          gridSize: number;
+        };
+        // Update grid size if provided
+        setGridSize(customSize);
         // Build grid from pattern
-        const newGrid = Array(gridSize).fill(false).map(() => Array(gridSize).fill(false));
+        const newGrid = Array.from({length: gridSize}, () => 
+          Array.from({length: gridSize}, () => false)
+        );
+         console.log("empty newGrid:", newGrid);
+        console.log("pattern:", pattern);
         pattern.forEach(linear => {
-          const [r, c] = linearToRC(linear, gridSize);
-          toggleCell(newGrid, r, c, false);
+          const [r, c] = linearToRC(linear, customSize);
+          // toggle single cell
+          newGrid[r][c] = !newGrid[r][c];
         });
+        setGridSize(customSize);
         setGrid(newGrid);
+
+        setInitialGrid(JSON.parse(JSON.stringify(newGrid)));
         setMoveCount(0);
         setWon(false);
         setPatternError(null);
@@ -294,11 +308,11 @@ const Game = (props: GameProps) => {
       })
       .finally(() => { if (isMounted) setIsLoadingPatterns(false); });
     return () => { isMounted = false; };
-  }, [isCustomRoute, level, gridSize, toggleCell, linearToRC]);
+  }, [gameMode, level, /* toggleCell */, linearToRC]);
 
   // Modified useEffect to use the new default grid size or skip for custom
   useEffect(() => {
-    if (isCustomRoute) return;
+    if (gameMode !== "classic") return;
     let isMounted = true;
 
     // Get level from URL params, location state, or default to 1
@@ -319,45 +333,84 @@ const Game = (props: GameProps) => {
     return () => {
       isMounted = false;
     };
-  }, [level, location.state?.level, initializeGame, isCustomRoute]);
+  }, [level, location.state?.level, initializeGame, gameMode]);
 
-  // Re-initialize when patterns are loaded
+  // Re-initialize when patterns are loaded for classic mode
   useEffect(() => {
+    if (gameMode !== "classic") return;
+    console.log('Patterns-loaded effect:', { isLoadingPatterns, classicPatterns, gameMode, gridSize, currentLevel });
     if (!isLoadingPatterns && Object.keys(classicPatterns).length > 0 && gameMode === "classic") {
+      console.log('Calling initializeGame from patterns-loaded effect');
       initializeGame(gridSize, currentLevel);
     }
   }, [classicPatterns, isLoadingPatterns, gameMode, gridSize, currentLevel, initializeGame]);
 
+  useEffect(() => {
+    // only for classic mode
+    if (gameMode !== "classic") return;
+    if (!initialGrid.length) return;               // nothing to check yet
+    const expected = classicPatterns[currentLevel]; // from your server fetch
+    if (!expected) return;                         // no pattern yet
+
+    const actual = gridToPattern(initialGrid);
+    if (!arePatternsEqual(expected, actual)) {
+      console.error(
+        `Puzzle mismatch for level ${currentLevel}!`,
+        "expected:", expected,
+        "got     :", actual
+      );
+    } else {
+      console.log(`Puzzle match verified for level ${currentLevel}`);
+    }
+  }, [initialGrid, classicPatterns, currentLevel, gameMode]);
+
+  // Compute minimum moves for random puzzles using solver
+  useEffect(() => {
+    if (gameMode !== "random" || !initialGrid.length) return;
+    const pattern = gridToPattern(initialGrid);
+    setMinMoves(null);
+    apiClient.post('/puzzles/validate', { pattern })
+      .then(res => {
+        console.log('Random puzzle minMoves:', res.data.minimumMoves);
+        setMinMoves(res.data.minimumMoves);
+      })
+      .catch(err => console.error('Failed to validate random puzzle', err));
+  }, [initialGrid, gameMode]);
+
   const handleCellClick = (row: number, col: number) => {
     if (won) return; // Don't allow moves after winning
-    
+
     // Create a deep copy of the current grid to avoid mutation issues
     const newGrid = JSON.parse(JSON.stringify(grid));
-    
-    // Apply the toggle cell operation to the copied grid
-    toggleCell(newGrid, row, col, true);
-    
+
+    // Apply the toggle cell operation without auto-count
+    toggleCell(newGrid, row, col, false);
+
+    // Manually increment move count
+    const newMoveCount = moveCount + 1;
+    setMoveCount(newMoveCount);
+
     // Update the grid state with the new grid configuration
     setGrid(newGrid);
-    
+
     // Check if all lights are off (win condition)
     const hasWon = newGrid.every((row: boolean[]) => row.every((cell: boolean) => !cell));
     if (hasWon) {
       setWon(true);
-      // Save the win and best score
-      saveGameProgress();
+      // Save the win and best score with the accurate move count
+      saveGameProgress(newMoveCount);
     }
   };
 
-  const saveGameProgress = async () => {
+  const saveGameProgress = async (movesParam?: number) => {
+    const movesToSend = movesParam !== undefined ? movesParam : moveCount;
     try {
-      // Implement API call to save progress
+      // Implement API call to save progress with accurate moves
       const response = await apiClient.post("/game/progress", {
         level: currentLevel,
-        moves: moveCount,
+        moves: movesToSend,
         completed: true
       });
-      
       console.log("Game progress saved:", response.data);
     } catch (error: any) {
       // Don't log auth errors since they're handled by the client
@@ -389,12 +442,6 @@ const Game = (props: GameProps) => {
     // Reinitialize the game with the new mode
     initializeGame(gridSize, currentLevel);
   };
-  
-  // Handle difficulty change - now only used for UI, doesn't affect puzzle loading
-  const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDifficulty(e.target.value as Difficulty);
-    // No longer need to fetch new patterns when difficulty changes
-  };
 
   // Reset the current puzzle to its initial state
   const handleResetPuzzle = () => {
@@ -409,10 +456,16 @@ const Game = (props: GameProps) => {
 
   return (
     <div className="game-container">
+      <h1>Lights Out</h1>
+      <br></br>
+      <h1>Level {currentLevel}</h1>
       <div className="game-header">
-        <h1>Lights Out - Level {currentLevel}</h1>
+        
         <div className="game-stats">
           <span>Moves: {moveCount}</span>
+          {gameMode === "random" && minMoves !== null && (
+            <span>Min Moves: {minMoves}</span>
+          )}
           <button onClick={handleResetPuzzle} className="back-button">
             Reset Puzzle
           </button>
@@ -420,7 +473,7 @@ const Game = (props: GameProps) => {
             {showIndices ? "Hide Indices" : "Show Indices"}
           </button>
           <button onClick={toggleGameMode} className="mode-toggle-button">
-            Mode: {gameMode === "classic" ? "Classic" : "Random"}
+            Mode: {gameMode === 'classic' ? 'Classic' : gameMode === 'random' ? 'Random' : 'Custom'}
           </button>
           
           <button onClick={() => navigate("/profile")} className="back-button">
@@ -434,34 +487,41 @@ const Game = (props: GameProps) => {
       ) : patternError ? (
         <div className="error-message">{patternError}</div>
       ) : (
-        <div className="light-grid">
-          {grid.map((row, rowIndex) => (
-            <div key={rowIndex} className="light-row">
-              {row.map((isOn, colIndex) => {
-                const linearIndex = rcToLinear(rowIndex, colIndex, gridSize);
-                return (
-                  <button
-                    key={`${rowIndex}-${colIndex}`}
-                    id={`light-${linearIndex}`}
-                    className={`light-button ${isOn ? "on" : "off"}`}
-                    onClick={() => handleCellClick(rowIndex, colIndex)}
-                  >
-                    {showIndices && linearIndex}
-                  </button>
-                );
-              })}
+        <div className="light-grid-wrapper">
+          <div className="light-grid">
+            {grid.map((row, rowIndex) => (
+              <div key={rowIndex} className="light-row">
+                {row.map((isOn, colIndex) => {
+                  const linearIndex = rcToLinear(rowIndex, colIndex, gridSize);
+                  return (
+                    <button
+                      key={`${rowIndex}-${colIndex}`}
+                      id={`light-${linearIndex}`}
+                      className={`light-button ${isOn ? "on" : "off"}`}
+                      onClick={() => handleCellClick(rowIndex, colIndex)}
+                    >
+                      {showIndices && linearIndex}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          {won && (
+            <div className="win-message">
+              <h2>Level Complete!</h2>
+              <p>You completed level {currentLevel} in {moveCount} moves.</p>
+              {gameMode === "custom" ? (
+                <button onClick={() => navigate('/saved-maps')} className="next-level-button">
+                  Back to Saved Maps
+                </button>
+              ) : (
+                <button onClick={goToNextLevel} className="next-level-button">
+                  Next Level
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
-
-      {won && (
-        <div className="win-message">
-          <h2>Level Complete!</h2>
-          <p>You completed level {currentLevel} in {moveCount} moves.</p>
-          <button onClick={goToNextLevel} className="next-level-button">
-            Next Level
-          </button>
+          )}
         </div>
       )}
     </div>

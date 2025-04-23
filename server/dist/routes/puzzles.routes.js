@@ -57,7 +57,24 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
  * Get all puzzles for a specific difficulty
  */
 router.get('/:difficulty', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const { difficulty } = req.params;
+    // Handle custom puzzles via saved_maps in game_stats
+    if (difficulty === 'custom') {
+        if (!req.user)
+            return res.status(401).json({ error: 'Unauthorized' });
+        try {
+            const { rows } = yield database_1.default.query(`SELECT saved_maps FROM game_stats WHERE user_id = $1`, [req.user.id]);
+            const saved = ((_a = rows[0]) === null || _a === void 0 ? void 0 : _a.saved_maps) || [];
+            const result = {};
+            saved.forEach(m => result[`level${m.level}`] = m.pattern);
+            return res.json(result);
+        }
+        catch (err) {
+            console.error('Error fetching custom puzzles:', err);
+            return res.status(500).json({ error: 'Failed to fetch custom puzzles' });
+        }
+    }
     const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', ''];
     // Handle empty difficulty parameter
     const difficultyParam = difficulty === '%20' || difficulty === ' ' ? '' : difficulty;
@@ -66,6 +83,7 @@ router.get('/:difficulty', (req, res) => __awaiter(void 0, void 0, void 0, funct
         return res.status(404).json({ error: `Difficulty '${difficultyParam}' not found` });
     }
     try {
+        // Classic puzzles
         const { rows } = yield database_1.default.query(`SELECT level, pattern FROM classic_puzzles WHERE difficulty = $1 ORDER BY level`, [difficultyParam]);
         // Format the response similar to the original structure
         const result = {};
@@ -84,9 +102,28 @@ router.get('/:difficulty', (req, res) => __awaiter(void 0, void 0, void 0, funct
  * Get a specific puzzle by difficulty and level
  */
 router.get('/:difficulty/:level', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const { difficulty, level } = req.params;
+    // Custom single puzzle
+    if (difficulty === 'custom') {
+        if (!req.user)
+            return res.status(401).json({ error: 'Unauthorized' });
+        const levelNumber = parseInt(level.replace('level', ''));
+        const { rows } = yield database_1.default.query(`SELECT saved_maps FROM game_stats WHERE user_id=$1`, [req.user.id]);
+        const saved = ((_a = rows[0]) === null || _a === void 0 ? void 0 : _a.saved_maps) || [];
+        const found = saved.find(m => m.level === levelNumber);
+        if (!found) {
+            return res.status(404).json({ error: 'Custom puzzle not found' });
+        }
+        // Return full object with pattern, minMoves, gridSize
+        return res.json(found);
+    }
+    const validDifficulties = ['easy', 'medium', 'hard', 'expert', 'classic', ''];
     // Handle empty difficulty parameter
     const difficultyParam = difficulty === '%20' || difficulty === ' ' ? '' : difficulty;
+    if (difficultyParam !== '' && !validDifficulties.includes(difficultyParam)) {
+        return res.status(404).json({ error: `Difficulty '${difficultyParam}' not found` });
+    }
     const levelNumber = parseInt(level.replace('level', ''));
     if (isNaN(levelNumber)) {
         return res.status(400).json({ error: 'Invalid level format' });
@@ -148,23 +185,16 @@ router.post('/create', (req, res) => __awaiter(void 0, void 0, void 0, function*
         return res.status(400).json({ error: 'Invalid minimum moves' });
     }
     try {
-        // Find the next available level number for custom puzzles
-        const { rows: levelRows } = yield database_1.default.query(`SELECT MAX(level) as max_level FROM classic_puzzles WHERE difficulty = 'custom'`);
+        // Find the next available custom level
+        const { rows: levelRows } = yield database_1.default.query(`SELECT MAX((item->>'level')::int) AS max_level FROM (
+         SELECT jsonb_array_elements(saved_maps) AS item
+         FROM game_stats WHERE user_id = $1
+       ) AS sub`, [req.user.id]);
         const nextLevel = ((_a = levelRows[0]) === null || _a === void 0 ? void 0 : _a.max_level) ? parseInt(levelRows[0].max_level) + 1 : 1;
-        // Insert the new puzzle
-        yield database_1.default.query(`INSERT INTO classic_puzzles (difficulty, level, pattern, created_by, min_moves)
-       VALUES ($1, $2, $3, $4, $5)`, ['custom', nextLevel, pattern, req.user.id, minimumMoves]);
-        // Also add to the user's saved maps
-        yield database_1.default.query(`WITH user_stats AS (
-         SELECT saved_maps FROM game_stats WHERE user_id = $1
-       )
-       UPDATE game_stats 
-       SET saved_maps = CASE 
-         WHEN user_stats.saved_maps IS NULL THEN jsonb_build_array($2::jsonb)
-         ELSE user_stats.saved_maps || jsonb_build_array($2::jsonb)
-       END
-       FROM user_stats
-       WHERE user_id = $1`, [req.user.id, JSON.stringify({ level: nextLevel, pattern, minimumMoves })]);
+        // Append new custom puzzle entry with minMoves and gridSize
+        yield database_1.default.query(`UPDATE game_stats
+         SET saved_maps = COALESCE(saved_maps, '[]'::jsonb) || to_jsonb($2)
+       WHERE user_id = $1`, [req.user.id, { level: nextLevel, pattern, minMoves: minimumMoves, gridSize: 5 }]);
         // Fetch updated saved_maps for the user
         const { rows: statsRows } = yield database_1.default.query(`SELECT saved_maps FROM game_stats WHERE user_id = $1`, [req.user.id]);
         const updatedSavedMaps = ((_b = statsRows[0]) === null || _b === void 0 ? void 0 : _b.saved_maps) || [];
@@ -172,6 +202,7 @@ router.post('/create', (req, res) => __awaiter(void 0, void 0, void 0, function*
             success: true,
             level: nextLevel,
             difficulty: 'custom',
+            gridSize: 5,
             saved_maps: updatedSavedMaps
         });
     }

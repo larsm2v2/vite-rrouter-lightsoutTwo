@@ -16,6 +16,7 @@ import puzzleRoutes from "./routes/puzzles.routes";
 import rateLimit from "express-rate-limit";
 import csrf from "csrf-csrf";
 import { param } from "express-validator";
+import profileRoutes from "./routes/profile";
 
 const app = express();
 
@@ -89,6 +90,9 @@ app.use("/auth", authRoutes);
 
 // Mount puzzle routes
 app.use("/puzzles", puzzleRoutes);
+
+// Mount profile routes
+app.use("/profile", profileRoutes);
 
 // Google OAuth Configuration
 const GOOGLE_OAUTH_URL = process.env.GOOGLE_OAUTH_URL;
