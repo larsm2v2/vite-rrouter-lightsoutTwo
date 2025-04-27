@@ -1,5 +1,9 @@
 steps:
-  # 1. Build the Docker image
+  # Debug step (separate from build)
+  - name: "alpine"
+    args: ["sh", "-c", "ls -la /workspace && ls -la /workspace/server"]
+
+  # 1. Build the Docker image (now separate step)
   - name: "gcr.io/cloud-builders/docker"
     args: [
         "build",
