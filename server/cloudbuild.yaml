@@ -6,7 +6,6 @@ steps:
         "build",
         "-t",
         "gcr.io/$PROJECT_ID/lightsout-server",
-        ".",
         "-f",
         "Dockerfile",
         ".",
