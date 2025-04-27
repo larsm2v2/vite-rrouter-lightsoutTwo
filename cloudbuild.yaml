@@ -1,10 +1,12 @@
 steps:
   # Debug step (list files first)
   - name: "alpine"
+    id: "debug-list-files"
     args: ["sh", "-c", "ls -la /workspace && ls -la /workspace/server"]
 
   # Precheck: Fail early if no Dockerfile exists
   - name: "alpine"
+    id: "check-dockerfile"
     args:
       [
         "sh",
@@ -14,6 +16,7 @@ steps:
 
   # 1. Build Docker image
   - name: "gcr.io/cloud-builders/docker"
+    id: "docker-build"
     dir: "server"
     args: [
         "build",
@@ -24,10 +27,12 @@ steps:
 
   # 2. Push Docker image to GCR
   - name: "gcr.io/cloud-builders/docker"
+    id: "docker-push"
     args: ["push", "gcr.io/$PROJECT_ID/lightsout-server"]
 
   # 3. Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "deploy-cloud-run"
     entrypoint: "gcloud"
     args:
       [
