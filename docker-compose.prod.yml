@@ -1,0 +1,46 @@
+services:
+  client:
+    build:
+      context: ./client/lightsoutTwo
+      target: builder # Uses Node stage only (for dev)
+    ports:
+      - "5173:5173" # Vite default port
+    volumes:
+      - ./client/lightsoutTwo:/app # Sync client directory (dev mode)
+      - /app/node_modules # Keep installed dependencies
+    environment:
+      - VITE_API_URL=http://localhost:8000 # Points to 'server' container
+    command: npm run dev -- --host # Run dev server for client
+    depends_on:
+      - server # Ensure the server is up before client starts
+
+  postgres:
+    image: postgres:latest # Neon PostgreSQL image
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASSWORD} # Use the password from .env file
+      POSTGRES_USER: ${PG_USER} # Use the user from .env file
+      POSTGRES_DB: ${PG_DATABASE} # Use the database from .env file
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persistent data
+    ports:
+      - "5432:5432" # Expose PostgreSQL to local port 5432
+
+  # Production (Separate) Version of the Server
+  server_prod:
+    build:
+      context: ./server
+    environment:
+      - NODE_ENV=production
+      - PG_URL=${PG_URL} # Ensure the production PG_URL is used here
+    env_file:
+      - ./server/.env_prod # Separate environment variables for production
+    command: npm start # Start the production server
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000" # Production port
+    restart: always # Auto-restart the container in production mode
+
+volumes:
+  postgres_data:
+    driver: local

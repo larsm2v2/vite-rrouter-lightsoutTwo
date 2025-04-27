@@ -190,7 +190,7 @@ const CreatePuzzle = () => {
             className="action-button toggle-adjacent"
             onClick={() => setToggleAdjacent(!toggleAdjacent)}
           >
-            {toggleAdjacent ? "Adjacent Enabled" : "Adjacent Disabled"}
+            {toggleAdjacent ? "Adjacent Toggle Enabled" : "Adjacent Toggle Disabled"}
           </button>
           {allOn ? (
             <button

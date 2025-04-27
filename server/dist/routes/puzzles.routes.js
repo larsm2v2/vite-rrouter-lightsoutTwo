@@ -14,7 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const database_1 = __importDefault(require("../config/database"));
-const puzzleSolver_1 = require("../utils/puzzleSolver");
+const worker_threads_1 = require("worker_threads");
+const path_1 = __importDefault(require("path"));
 const router = express_1.default.Router();
 /**
  * GET /puzzles
@@ -154,17 +155,42 @@ router.post('/validate', (req, res) => __awaiter(void 0, void 0, void 0, functio
         return res.status(400).json({ error: 'Invalid pattern format' });
     }
     try {
-        // Use the BFS solver to find the solution (allow up to 25 moves for full 5x5 grid)
-        const { solvable, minimumMoves, solution } = (0, puzzleSolver_1.solvePuzzle)(pattern, 5, 25);
-        console.log('Validation result:', { solvable, minimumMoves, solution });
-        res.json({
-            solvable,
-            minimumMoves,
-            solution
+        // Offload puzzle solving to a worker with a 15 sec timeout
+        const workerPath = path_1.default.resolve(__dirname, '../utils/solverWorker.js');
+        const worker = new worker_threads_1.Worker(workerPath, { workerData: { pattern, size: 5, maxMoves: 25 } });
+        const result = yield new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                worker.terminate();
+                reject(new Error('Invalid puzzle! Solver timed out'));
+            }, 15000);
+            worker.on('message', (msg) => {
+                clearTimeout(timeout);
+                resolve(msg);
+            });
+            worker.on('error', (err) => {
+                clearTimeout(timeout);
+                reject(err);
+            });
+            worker.on('exit', (code) => {
+                if (code !== 0) {
+                    clearTimeout(timeout);
+                    reject(new Error(`Worker stopped with exit code ${code}`));
+                }
+            });
         });
+        if (result.error) {
+            console.error('Error in solver worker:', result.error);
+            return res.status(500).json({ error: 'Failed to validate puzzle' });
+        }
+        const { solvable, minimumMoves, solution } = result;
+        console.log('Validation result:', { solvable, minimumMoves, solution });
+        res.json({ solvable, minimumMoves, solution });
     }
     catch (err) {
         console.error('Error validating puzzle:', err);
+        if (err.message === 'Invalid puzzle! Solver timed out') {
+            return res.status(503).json({ error: 'Invalid puzzle! Solver timed out' });
+        }
         res.status(500).json({ error: 'Failed to validate puzzle' });
     }
 }));
@@ -193,8 +219,8 @@ router.post('/create', (req, res) => __awaiter(void 0, void 0, void 0, function*
         const nextLevel = ((_a = levelRows[0]) === null || _a === void 0 ? void 0 : _a.max_level) ? parseInt(levelRows[0].max_level) + 1 : 1;
         // Append new custom puzzle entry with minMoves and gridSize
         yield database_1.default.query(`UPDATE game_stats
-         SET saved_maps = COALESCE(saved_maps, '[]'::jsonb) || to_jsonb($2)
-       WHERE user_id = $1`, [req.user.id, { level: nextLevel, pattern, minMoves: minimumMoves, gridSize: 5 }]);
+         SET saved_maps = COALESCE(saved_maps, '[]'::jsonb) || $2::jsonb
+       WHERE user_id = $1`, [req.user.id, JSON.stringify({ level: nextLevel, pattern, minMoves: minimumMoves, gridSize: 5 })]);
         // Fetch updated saved_maps for the user
         const { rows: statsRows } = yield database_1.default.query(`SELECT saved_maps FROM game_stats WHERE user_id = $1`, [req.user.id]);
         const updatedSavedMaps = ((_b = statsRows[0]) === null || _b === void 0 ? void 0 : _b.saved_maps) || [];

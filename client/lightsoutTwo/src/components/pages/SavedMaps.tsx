@@ -8,6 +8,8 @@ interface SavedMap {
   level: number;
   pattern: number[];
   minimumMoves: number;
+  minMoves: number;
+  gridSize: number;
 }
 
 const SavedMaps = () => {
@@ -35,6 +37,8 @@ const SavedMaps = () => {
       try {
         const response = await apiClient.get("/profile", { withCredentials: true });
         setMaps(response.data.stats.saved_maps);
+        console.log("Mapdata:", response.data.stats.saved_maps)
+        console.log("maps:", maps)
       } catch (err: any) {
         console.error("Failed to fetch saved maps:", err);
         setError("Failed to load saved maps.");
@@ -55,6 +59,9 @@ const SavedMaps = () => {
   return (
     <div className="saved-maps-container">
       <h1>Your Saved Maps</h1>
+      <button className="back-button" onClick={() => navigate('/profile')}>
+              Back to Profile
+            </button>
       {maps.length > 0 ? (
         <>
           <div className="saved-maps-grid">
@@ -66,15 +73,14 @@ const SavedMaps = () => {
               >
                 <Thumbnail pattern={map.pattern} />
                 <div className="saved-map-level">Level {map.level}</div>
-                <div className="saved-map-moves">Min Moves: {map.minimumMoves}</div>
+                <div className="saved-map-moves">Min Moves: { map.minMoves|| map.minimumMoves }</div>
+                <div className="saved-map-grid-size">Grid Size: {map.gridSize}</div>
               </div>
             ))}
           </div>
 
           <div className="map-actions">
-            <button className="back-button" onClick={() => navigate('/profile')}>
-              Back to Profile
-            </button>
+
             <button
               className="play-button"
               disabled={!selectedMap}

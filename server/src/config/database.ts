@@ -2,8 +2,7 @@
 import dotenv from 'dotenv';
 dotenv.config(); 
 import { Pool } from "pg";
-import { env } from "process";
-import { testPool } from "./test-config";
+
 
 declare global {
   namespace Express {
@@ -15,47 +14,53 @@ declare global {
   }
 }
 
+const isTestEnv = process.env.NODE_ENV === "test";
 // PostgreSQL configuration
 const pgConfig =
-  process.env.NODE_ENV === "test"
+isTestEnv 
     ? {
-        user: env.PG_USER || "postgres",
+        user: process.env.PG_USER || "postgres",
         host: process.env.PG_HOST_TEST || "localhost",
         database: process.env.PG_DATABASE_TEST || "ttlo_test",
         password: process.env.PG_PASSWORD || "your_password",
-        port: parseInt(env.PG_PORT || "5432"),
+        port: parseInt(process.env.PG_PORT || "5432"),
         max: 20, // max number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
       }
+      : process.env.PG_URL
+      ? {
+          connectionString: process.env.PG_URL,
+          ssl: { rejectUnauthorized: false },
+          max: 10,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+        }
     : {
         user: process.env.PG_USER || "postgres",
         host: process.env.PG_HOST || "localhost",
         database: process.env.PG_DATABASE || "TTLO",
         password: process.env.PG_PASSWORD || "your_password",
         port: parseInt(process.env.PG_PORT || "5432"),
-        max: 20, // max number of clients in the pool
+        max: 10, // max number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
+        ssl: { rejectUnauthorized: false },
       };
 
 // Use test pool in test environment
-const pool = process.env.NODE_ENV === "test" ? testPool : new Pool(pgConfig);
+const pool = new Pool(pgConfig);
 
 // Test the connection
-if (process.env.NODE_ENV !== "test") {
+if (!isTestEnv) {
   pool
     .query("SELECT NOW() as now")
     .then((res) => {
-      if (process.env.NODE_ENV !== "test") {
-        console.log("✅ PostgreSQL connected");
-      }
+      console.log("✅ PostgreSQL connected at", res.rows[0].now);
     })
     .catch((err) => {
       console.error("❌ PostgreSQL connection error:", err);
-      if (process.env.NODE_ENV !== "test") {
-        process.exit(1); // Only exit in non-test environments
-      }
+      process.exit(1);
     });
 }
 

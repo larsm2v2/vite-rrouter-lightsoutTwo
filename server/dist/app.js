@@ -61,7 +61,7 @@ app.use((0, cors_1.default)({
         }
     },
     credentials: true, // Required for cookies/sessions
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
     exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
 }));
 app.options("*", (0, cors_1.default)());

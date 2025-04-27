@@ -27,9 +27,11 @@ const pgConfig = process.env.NODE_ENV === "test"
         database: process.env.PG_DATABASE || "TTLO",
         password: process.env.PG_PASSWORD || "your_password",
         port: parseInt(process.env.PG_PORT || "5432"),
-        max: 20, // max number of clients in the pool
+        max: 10, // max number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
+        connectionString: process.env.PG_URL,
+        ssl: { rejectUnauthorized: false },
     };
 // Use test pool in test environment
 const pool = process.env.NODE_ENV === "test" ? test_config_1.testPool : new pg_1.Pool(pgConfig);

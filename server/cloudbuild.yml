@@ -1,0 +1,41 @@
+steps:
+  # 1. Build the Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "gcr.io/$PROJECT_ID/lightsout-server",
+        ".",
+        "-f",
+        "Dockerfile",
+      ]
+
+  # 2. Push the Docker image to Google Container Registry (GCR)
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/lightsout-server"]
+
+  # 3. Deploy the image to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args: [
+        "run",
+        "deploy",
+        "lightsout-server",
+        "--image",
+        "gcr.io/$PROJECT_ID/lightsout-server",
+        "--region",
+        "us-central1", # or your preferred region
+        "--platform",
+        "managed",
+        "--port",
+        "8000",
+        "--allow-unauthenticated",
+      ]
+
+images:
+  - "gcr.io/$PROJECT_ID/lightsout-server"
+
+options:
+  machineType: "E2_HIGHCPU_8" # Faster builds (optional)
+  logging: CLOUD_LOGGING_ONLY

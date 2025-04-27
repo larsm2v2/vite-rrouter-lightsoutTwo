@@ -7,6 +7,11 @@ import jwt from "jsonwebtoken";
 import { hashPassword, comparePassword } from "../config/auth/password";
 import pool from "../config/database";
 
+declare module 'express-session' {
+  interface SessionData {
+    oauthState?: string; // Add this line
+  }
+}
 const router = Router();
 
 // Simple test endpoint to verify request body parsing

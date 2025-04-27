@@ -14,7 +14,6 @@ import helmet from "helmet";
 import authRoutes from "./routes/auth.routes";
 import puzzleRoutes from "./routes/puzzles.routes";
 import rateLimit from "express-rate-limit";
-import csrf from "csrf-csrf";
 import { param } from "express-validator";
 import profileRoutes from "./routes/profile";
 
@@ -56,7 +55,7 @@ app.use(
       }
     },
     credentials: true, // Required for cookies/sessions
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
     exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
   })
 );
@@ -448,9 +447,20 @@ const authRateLimiter = rateLimit({
 });
 app.use(authRateLimiter);
 
+async function ensureDatabaseInitialized() {
+  try {
+    // Try to query the users table
+    await pool.query("SELECT 1 FROM users LIMIT 1");
+    console.log("✅ Database already initialized.");
+  } catch (error) {
+    console.warn("⚠️ Database not initialized. Running initializeDatabase()...");
+    await initializeDatabase();
+  }
+}
+
 // Start the server
 async function startServer() {
-  await initializeDatabase();
+  await ensureDatabaseInitialized(); 
   const PORT = process.env.PORT || 8000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }

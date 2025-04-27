@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "./Client";
-import Thumbnail from "../Thumbnail/Thumbnail";
 import "./Profile.css";
 
 interface User {
@@ -50,7 +49,13 @@ const Profile = () => {
           }
           
           if (response.data.stats) {
-            setStats(response.data.stats);
+            // Ensure current_level is at least the number of completed levels
+            const fetchedStats = response.data.stats;
+            const comboLength = fetchedStats.best_combination?.length || 0;
+            if (fetchedStats.current_level < comboLength) {
+              fetchedStats.current_level = comboLength;
+            }
+            setStats(fetchedStats);
           }
           
           setLoading(false);
@@ -171,8 +176,8 @@ const Profile = () => {
           <h2>Game Statistics</h2>
           <div className="stats-grid">
             <StatCard
-              title="Current Level"
-              value={stats?.current_level || 1}
+              title="Highest Completed Level"
+              value={stats?.current_level - 1|| 1}
               icon="🏆"
             />
             <div className="level-grid-container">
@@ -190,7 +195,9 @@ const Profile = () => {
                   const idx = level - 1;
                   const moves = bestComb[idx];
                   const minMove = minMovesMap[level];
-                  const currentToPlay = stats.current_level || 1;
+
+                  // Determine the next level after last finished, default to 1
+                  const currentToPlay = stats.current_level != null ? stats.current_level : 1;
                   // Determine status: locked, completed, perfect, or next
                   let levelStatus: 'locked' | 'completed' | 'perfect' | 'next' = 'locked';
                   if (moves != null && moves > 0) levelStatus = 'completed';
@@ -231,7 +238,28 @@ const Profile = () => {
             />
           </div>
         </div>
-
+        <div className="game-actions">
+          <button 
+            className="action-button primary" 
+            onClick={() => navigate(`/game/${stats?.current_level || 1}`, { 
+              state: { level: stats?.current_level || 1 }
+            })}
+          >
+            Continue Game
+          </button>
+          <button 
+            className="action-button secondary"
+            onClick={handleNewGame}
+          >
+            New Game
+          </button>
+          <button 
+            className="action-button create"
+            onClick={() => navigate('/create-puzzle')}
+          >
+            Create Puzzle
+          </button>
+        </div>
         <div className="recent-levels-section">
           <h2>Recent Level Completions</h2>
           {lastFiveLevels.length > 0 ? (
@@ -278,28 +306,7 @@ const Profile = () => {
           )}
         </div> */}
 
-        <div className="game-actions">
-          <button 
-            className="action-button primary" 
-            onClick={() => navigate(`/game/${stats?.current_level || 1}`, { 
-              state: { level: stats?.current_level || 1 }
-            })}
-          >
-            Continue Game
-          </button>
-          <button 
-            className="action-button secondary"
-            onClick={handleNewGame}
-          >
-            New Game
-          </button>
-          <button 
-            className="action-button create"
-            onClick={() => navigate('/create-puzzle')}
-          >
-            Create Puzzle
-          </button>
-        </div>
+
       </div>
     </div>
   );
