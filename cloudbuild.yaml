@@ -11,8 +11,6 @@ steps:
         "build",
         "-t",
         "gcr.io/$PROJECT_ID/lightsout-server",
-        "-f",
-        "Dockerfile", # Path relative to root
         ".", # Context is server directory
       ]
 
