@@ -7,7 +7,7 @@ steps:
         "gcr.io/$PROJECT_ID/lightsout-server",
         "-f",
         "server/Dockerfile", # Path relative to root
-        "server/", # Context is server directory
+        "server", # Context is server directory
       ]
 
   # 2. Push the Docker image to Google Container Registry (GCR)
