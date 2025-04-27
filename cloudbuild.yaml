@@ -1,17 +1,19 @@
 steps:
   # Debug step (separate from build)
   - name: "alpine"
+
     args: ["sh", "-c", "ls -la /workspace && ls -la /workspace/server"]
 
   # 1. Build the Docker image (now separate step)
   - name: "gcr.io/cloud-builders/docker"
+    dir: "server"
     args: [
         "build",
         "-t",
         "gcr.io/$PROJECT_ID/lightsout-server",
         "-f",
-        "server/Dockerfile", # Path relative to root
-        "server", # Context is server directory
+        "Dockerfile", # Path relative to root
+        ".", # Context is server directory
       ]
 
   # 2. Push the Docker image to Google Container Registry (GCR)
