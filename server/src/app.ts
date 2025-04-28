@@ -4,7 +4,7 @@ dotenv.config();
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import session from "express-session";
-import passport from "./config/auth/passport"; // Ensure this is correctly configured
+import passport, { configurePassport } from "./config/auth/passport"; // Ensure this is correctly configured
 import { sessionConfig } from "./config/auth/sessions";
 import * as crypto from "crypto";
 import type { User } from "./types/entities/User"; // Import the User interface
@@ -33,20 +33,23 @@ requiredEnvVars.forEach((varName) => {
   }
 });
 
+// Configure Passport
+configurePassport();
+
 // Middleware
 app.use(helmet());
 app.use(
   cors({
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps, curl)
       if (!origin) return callback(null, true);
-      
+
       const allowedOrigins = [
-        process.env.CLIENT_URL, 
-        'http://localhost:5173',
-        'http://localhost:5174'
+        process.env.CLIENT_URL,
+        "http://localhost:5173",
+        "http://localhost:5174",
       ];
-      
+
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
@@ -80,7 +83,7 @@ app.use(passport.session());
 // Add request logger middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  console.log('Headers:', req.headers);
+  console.log("Headers:", req.headers);
   next();
 });
 
@@ -152,7 +155,7 @@ app.get("/", (req: Request, res: Response) => {
 // Protected routes
 app.get("/profile", async (req, res) => {
   // For tests, add debug logging
-  if (process.env.NODE_ENV === 'test') {
+  if (process.env.NODE_ENV === "test") {
     console.log("Profile request:", {
       hasUser: !!req.user,
       user: req.user,
@@ -160,7 +163,7 @@ app.get("/profile", async (req, res) => {
       hasSession: !!req.session,
     });
   }
-  
+
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
 
   try {
@@ -293,29 +296,29 @@ app.post("/game/progress", async (req: Request, res: Response) => {
 
   try {
     const { level, moves, completed } = req.body;
-    
+
     // Validate input
-    if (!level || typeof level !== 'number') {
+    if (!level || typeof level !== "number") {
       return res.status(400).json({ error: "Invalid level" });
     }
-    
+
     // First, get the current level
     const userStatsResult = await pool.query(
       `SELECT current_level, best_combination 
        FROM game_stats WHERE user_id = $1`,
       [req.user.id]
     );
-    
+
     const userStats = userStatsResult.rows[0];
     const currentLevel = userStats?.current_level || 1;
-    
+
     // Only update level if the completed level is the current one
     // and we're moving to the next level
     let newLevel = currentLevel;
     if (completed && level === currentLevel) {
       newLevel = currentLevel + 1;
     }
-    
+
     // Store the moves as best combination if better than current
     // or if no best combination exists for this level
     let bestCombination = userStats?.best_combination || [];
@@ -333,7 +336,7 @@ app.post("/game/progress", async (req: Request, res: Response) => {
         bestCombination = newBestCombination;
       }
     }
-    
+
     // Update the database
     await pool.query(
       `UPDATE game_stats
@@ -341,11 +344,11 @@ app.post("/game/progress", async (req: Request, res: Response) => {
        WHERE user_id = $3`,
       [newLevel, JSON.stringify(bestCombination), req.user.id]
     );
-    
-    res.json({ 
+
+    res.json({
       success: true,
       current_level: newLevel,
-      best_combination: bestCombination
+      best_combination: bestCombination,
     });
   } catch (err) {
     console.error("Game progress update error:", err);
@@ -355,22 +358,22 @@ app.post("/game/progress", async (req: Request, res: Response) => {
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   // Log the error with stack trace
-  console.error('Server error:', err);
-  console.error('Error stack:', err.stack);
-  
+  console.error("Server error:", err);
+  console.error("Error stack:", err.stack);
+
   // For OAuth errors, add more detailed logging
-  if (req.path.includes('/auth/google') || req.path.includes('/callback')) {
-    console.error('OAuth error details:', {
+  if (req.path.includes("/auth/google") || req.path.includes("/callback")) {
+    console.error("OAuth error details:", {
       path: req.path,
       method: req.method,
       query: req.query,
-      session: req.session ? 'Session exists' : 'No session',
-      user: req.user ? 'User exists' : 'No user',
+      session: req.session ? "Session exists" : "No session",
+      user: req.user ? "User exists" : "No user",
     });
   }
-  
+
   // Don't expose error details in production
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === "production") {
     return res.status(500).json({ error: "Internal Server Error" });
   } else {
     // In development, return the error details
@@ -383,52 +386,57 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Initialize database for tests
-if (process.env.NODE_ENV === 'test') {
+if (process.env.NODE_ENV === "test") {
   initializeDatabase()
     .then(() => console.log("✅ Test database initialized"))
-    .catch(err => console.error("❌ Test database initialization failed:", err));
+    .catch((err) =>
+      console.error("❌ Test database initialization failed:", err)
+    );
 }
 
 // Test routes - only available in test environment
-if (process.env.NODE_ENV === 'test') {
-  app.post("/test/mock-login", (req: Request, res: Response, next: NextFunction) => {
-    console.log("Mock login request:", {
-      userId: req.body.userId,
-      sessionID: req.sessionID,
-    });
-    
-    // Create test user object
-    const testUser = {
-      id: req.body.userId,
-      email: "test@example.com",
-      display_name: "Test User",
-    };
-    
-    // Login with the test user
-    req.login(testUser, { session: true }, (err) => {
-      if (err) {
-        console.error("Login error:", err);
-        return res.status(500).json({ error: err.message });
-      }
-      
-      // Save the session
-      req.session.save((err) => {
+if (process.env.NODE_ENV === "test") {
+  app.post(
+    "/test/mock-login",
+    (req: Request, res: Response, next: NextFunction) => {
+      console.log("Mock login request:", {
+        userId: req.body.userId,
+        sessionID: req.sessionID,
+      });
+
+      // Create test user object
+      const testUser = {
+        id: req.body.userId,
+        email: "test@example.com",
+        display_name: "Test User",
+      };
+
+      // Login with the test user
+      req.login(testUser, { session: true }, (err) => {
         if (err) {
-          console.error("Session save error:", err);
+          console.error("Login error:", err);
           return res.status(500).json({ error: err.message });
         }
-        
-        console.log("Login successful:", {
-          user: req.user,
-          sessionID: req.sessionID,
-          sessionCookie: req.sessionID && res.getHeader('set-cookie'),
+
+        // Save the session
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ error: err.message });
+          }
+
+          console.log("Login successful:", {
+            user: req.user,
+            sessionID: req.sessionID,
+            sessionCookie: req.sessionID && res.getHeader("set-cookie"),
+          });
+
+          // Return success with the cookie
+          return res.status(200).json({ success: true });
         });
-        
-        // Return success with the cookie
-        return res.status(200).json({ success: true });
       });
-    });
-  });
+    }
+  );
 }
 
 const authRateLimiter = rateLimit({
@@ -453,14 +461,16 @@ async function ensureDatabaseInitialized() {
     await pool.query("SELECT 1 FROM users LIMIT 1");
     console.log("✅ Database already initialized.");
   } catch (error) {
-    console.warn("⚠️ Database not initialized. Running initializeDatabase()...");
+    console.warn(
+      "⚠️ Database not initialized. Running initializeDatabase()..."
+    );
     await initializeDatabase();
   }
 }
 
 // Start the server
 async function startServer() {
-  await ensureDatabaseInitialized(); 
+  await ensureDatabaseInitialized();
   const PORT = process.env.PORT || 8000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
