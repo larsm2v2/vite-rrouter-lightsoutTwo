@@ -7,7 +7,7 @@ export interface ApiResponse<T> {
 }
 
 // Get the API URL from environment variables or use default
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 // Create a typed wrapper around Axios
 const apiClient: AxiosInstance = axios.create({
@@ -60,21 +60,26 @@ apiClient.interceptors.response.use(
       // Simply pass it through without logging for cancellation errors
       return Promise.reject({
         isConnectionError: true,
-        message: 'Request was cancelled',
-        isCancelled: true
+        message: "Request was cancelled",
+        isCancelled: true,
       });
     }
-    
+
     // Handle network errors - connection refused, server not running
-    if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
-      console.error('Network error - server might be down:', error.message);
+    if (
+      error.code === "ECONNABORTED" ||
+      error.message === "Network Error" ||
+      !error.response
+    ) {
+      console.error("Network error - server might be down:", error.message);
       // You can handle this differently without redirecting
       return Promise.reject({
         isConnectionError: true,
-        message: 'Cannot connect to server. Please ensure the server is running.',
+        message:
+          "Cannot connect to server. Please ensure the server is running.",
       });
     }
-    
+
     // Handle unauthorized - session expired or not logged in
     if (error.response?.status === 401) {
       // Prevent redirect loops by checking time since last redirect
@@ -82,13 +87,13 @@ apiClient.interceptors.response.use(
       if (now - lastAuthRedirect > redirectDebounceTime) {
         // Only redirect if we're not already on the login page
         const currentPath = window.location.pathname;
-        if (!currentPath.includes('/login')) {
+        if (!currentPath.includes("/login")) {
           lastAuthRedirect = now;
-          console.log('Auth failed, redirecting to login');
+          console.log("Auth failed, redirecting to login");
           window.location.href = "/login";
         }
       } else {
-        console.log('Suppressing duplicate auth redirect');
+        console.log("Suppressing duplicate auth redirect");
       }
     }
 
