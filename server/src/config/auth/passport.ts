@@ -248,15 +248,19 @@ passport.serializeUser<number>((user: Express.User, done) => {
 
 passport.deserializeUser<number>(async (id: number, done) => {
   try {
+    console.log("deserializeUser called with id:", id);
+    console.log("Attempting to query user with id:", id);
     const result = await dbPool.query<Express.User>(
       `SELECT id, email, display_name 
        FROM users 
        WHERE id = $1`,
       [id]
     );
-
+    console.log("User query result:", result.rows[0]);
+    console.log("Calling done with:", result.rows[0] || false);
     done(null, result.rows[0] || false);
   } catch (err) {
+    console.error("Deserialization error:", err);
     done(err instanceof Error ? err : undefined);
   }
 });
