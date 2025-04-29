@@ -18,7 +18,7 @@ import { param } from "express-validator";
 import profileRoutes from "./routes/profile";
 
 const app = express();
-
+app.set("trust proxy", 1);
 const requiredEnvVars = [
   "SESSION_SECRET",
   "GOOGLE_CLIENT_ID",
