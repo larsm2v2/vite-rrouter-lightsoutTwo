@@ -8,22 +8,26 @@ const Login = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Form state
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
+  const API_URL =
+    import.meta.env.VITE_API_URL ??
+    (import.meta.env.DEV ? "http://localhost:8000" : window.location.origin);
+
   // Check URL parameters for error
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const errorParam = params.get('error');
+    const errorParam = params.get("error");
     if (errorParam) {
       setError(
-        errorParam === 'auth_failed' 
-          ? 'Authentication failed. Please try again.' 
+        errorParam === "auth_failed"
+          ? "Authentication failed. Please try again."
           : `Login error: ${errorParam}`
       );
     }
@@ -37,16 +41,16 @@ const Login = () => {
 
     const checkAuth = async () => {
       if (!isActive) return; // Don't proceed if no longer active
-      
+
       try {
         setLoading(true);
         setError(null); // Clear previous errors
-        
+
         const { data } = await apiClient.get("/auth/check", {
           signal: controller.signal,
           withCredentials: true,
           // Add a shorter timeout just for the auth check
-          timeout: 5000
+          timeout: 5000,
         });
 
         // Only update state if component is still mounted
@@ -59,15 +63,23 @@ const Login = () => {
         }
       } catch (error: any) {
         // Only update state if component is still mounted and error isn't from cancellation
-        if (isActive && error.name !== 'CanceledError' && error.code !== 'ERR_CANCELED') {
+        if (
+          isActive &&
+          error.name !== "CanceledError" &&
+          error.code !== "ERR_CANCELED"
+        ) {
           console.error("Auth check failed:", error);
-          
+
           // Handle connection errors specially
           if (error.isConnectionError) {
-            setError("Cannot connect to server. Please ensure the server is running at http://localhost:8000");
+            setError(
+              "Cannot connect to server. Please ensure the server is running at http://localhost:8000"
+            );
           } else {
             // Handle other errors
-            setError("Failed to check authentication status. Please try again later.");
+            setError(
+              "Failed to check authentication status. Please try again later."
+            );
           }
           setLoading(false);
           setAuthChecked(true);
@@ -96,37 +108,40 @@ const Login = () => {
     e.preventDefault();
     setFormError(null);
     setLoading(true);
-    
+
     if (!email) {
       setFormError("Email is required");
       setLoading(false);
       return;
     }
-    
+
     if (!password) {
       setFormError("Password is required");
       setLoading(false);
       return;
     }
-    
+
     try {
       const response = await apiClient.post("/auth/login", {
         email,
-        password
+        password,
       });
-      
+
       if (response.status === 200) {
         navigate("/profile");
       }
     } catch (error: any) {
       console.error("Login failed:", error);
-      
+
       // More detailed error reporting
       if (error.response) {
         console.error("Response data:", error.response.data);
         console.error("Response status:", error.response.status);
         console.error("Response headers:", error.response.headers);
-        setFormError(error.response.data.message || "Login failed. Please check your credentials.");
+        setFormError(
+          error.response.data.message ||
+            "Login failed. Please check your credentials."
+        );
       } else if (error.request) {
         console.error("No response received:", error.request);
         setFormError("No response from server. Please try again later.");
@@ -138,56 +153,59 @@ const Login = () => {
       setLoading(false);
     }
   };
-  
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    
+
     if (!email) {
       setFormError("Email is required");
       return;
     }
-    
+
     if (!password) {
       setFormError("Password is required");
       return;
     }
-    
+
     // Check if passwords match
     if (password !== confirmPassword) {
       setFormError("Passwords do not match");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       // Create registration payload
       const payload = {
         email: email,
         password: password,
-        display_name: email.split('@')[0]
+        display_name: email.split("@")[0],
       };
-      
+
       console.log("Sending registration payload:", JSON.stringify(payload));
-      
+
       const response = await apiClient.post("/auth/register", payload);
-      
+
       console.log("Registration response:", response);
-      
+
       if (response.status === 201) {
         // No need to login separately - server already logs us in
         navigate("/profile");
       }
     } catch (error: any) {
       console.error("Registration failed:", error);
-      
+
       // More detailed error reporting
       if (error.response) {
         console.error("Response data:", error.response.data);
         console.error("Response status:", error.response.status);
         console.error("Response headers:", error.response.headers);
-        setFormError(error.response.data.message || "Registration failed. Please try again.");
+        setFormError(
+          error.response.data.message ||
+            "Registration failed. Please try again."
+        );
       } else if (error.request) {
         console.error("No response received:", error.request);
         setFormError("No response from server. Please try again later.");
@@ -212,35 +230,29 @@ const Login = () => {
           <p className="subtext">Please sign in to continue</p>
         </div>
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-        
+        {error && <div className="error-message">{error}</div>}
+
         {/* Tab navigation */}
         <div className="auth-tabs">
-          <button 
-            className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
-            onClick={() => setActiveTab('login')}>
+          <button
+            className={`tab-button ${activeTab === "login" ? "active" : ""}`}
+            onClick={() => setActiveTab("login")}
+          >
             Login
           </button>
-          <button 
-            className={`tab-button ${activeTab === 'register' ? 'active' : ''}`}
-            onClick={() => setActiveTab('register')}>
+          <button
+            className={`tab-button ${activeTab === "register" ? "active" : ""}`}
+            onClick={() => setActiveTab("register")}
+          >
             Register
           </button>
         </div>
-        
+
         {/* Form error message */}
-        {formError && (
-          <div className="error-message">
-            {formError}
-          </div>
-        )}
-        
+        {formError && <div className="error-message">{formError}</div>}
+
         {/* Login Form */}
-        {activeTab === 'login' && (
+        {activeTab === "login" && (
           <form onSubmit={handleLocalLogin} className="auth-form">
             <div className="form-group">
               <label htmlFor="email">Email</label>
@@ -264,17 +276,14 @@ const Login = () => {
                 disabled={loading}
               />
             </div>
-            <button 
-              type="submit" 
-              className="submit-button"
-              disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+            <button type="submit" className="submit-button" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
             </button>
           </form>
         )}
-        
+
         {/* Register Form */}
-        {activeTab === 'register' && (
+        {activeTab === "register" && (
           <form onSubmit={handleRegister} className="auth-form">
             <div className="form-group">
               <label htmlFor="reg-email">Email</label>
@@ -311,11 +320,8 @@ const Login = () => {
                 disabled={loading}
               />
             </div>
-            <button 
-              type="submit" 
-              className="submit-button"
-              disabled={loading}>
-              {loading ? 'Registering...' : 'Register'}
+            <button type="submit" className="submit-button" disabled={loading}>
+              {loading ? "Registering..." : "Register"}
             </button>
           </form>
         )}
@@ -326,7 +332,7 @@ const Login = () => {
 
         <div className="oauth-providers">
           <a
-            href="http://localhost:8000/auth/google"
+            href={`${API_URL}/auth/google`}
             className="provider-button google"
             onClick={handleGoogleLogin}
             aria-disabled={loading}
@@ -349,7 +355,7 @@ const Login = () => {
                 fill="#EA4335"
               />
             </svg>
-            {loading ? 'Please wait...' : 'Continue with Google'}
+            {loading ? "Please wait..." : "Continue with Google"}
           </a>
         </div>
       </div>
