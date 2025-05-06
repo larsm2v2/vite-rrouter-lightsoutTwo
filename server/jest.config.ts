@@ -14,6 +14,7 @@ const config: Config.InitialOptions = {
       NODE_ENV: "test", // Force test environment
     },
   },
+  verbose: true,
   setupFiles: [
     "dotenv/config", // Loads .env.test automatically
   ],
@@ -25,4 +26,3 @@ const config: Config.InitialOptions = {
 };
 
 export default config;
-

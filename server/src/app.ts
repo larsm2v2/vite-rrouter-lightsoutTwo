@@ -37,7 +37,25 @@ requiredEnvVars.forEach((varName) => {
 configurePassport();
 
 // Middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "https://accounts.google.com"],
+        connectSrc: ["'self'", "https://accounts.google.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'self'", "https://accounts.google.com"],
+        // Remove the unsupported directive
+        // requireTrustedTypesFor: ["'script'"]
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: function (origin, callback) {
