@@ -37,25 +37,38 @@ requiredEnvVars.forEach((varName) => {
 configurePassport();
 
 // Middleware
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", "data:", "https://accounts.google.com"],
-        connectSrc: ["'self'", "https://accounts.google.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'self'", "https://accounts.google.com"],
-        // Remove the unsupported directive
-        // requireTrustedTypesFor: ["'script'"]
+app.use((req, res, next) => {
+  const userAgent = req.headers["user-agent"] || "";
+  const isSafari =
+    userAgent.includes("Safari") && !userAgent.includes("Chrome");
+
+  if (isSafari) {
+    // Safari-compatible helmet config
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "https://apis.google.com", // adjust for your OAuth2 provider
+            "'unsafe-inline'", // only if needed (e.g., for inline OAuth script snippets)
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'"], // needed if you use inline styles
+          connectSrc: ["'self'", "https://your-api-endpoint.com"],
+          imgSrc: ["'self'", "data:", "https://your-image-cdn.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          frameSrc: ["https://accounts.google.com"], // for Google OAuth
+          objectSrc: ["'none'"],
+          upgradeInsecureRequests: [],
+          // NO require-trusted-types-for
+        },
       },
-    },
-  })
-);
+    })(req, res, next);
+  } else {
+    // Default helmet for other browsers
+    helmet()(req, res, next);
+  }
+});
 app.use(
   cors({
     origin: function (origin, callback) {
