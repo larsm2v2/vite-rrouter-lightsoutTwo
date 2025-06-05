@@ -34,8 +34,8 @@ export const sessionConfig: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: true, // Must be true for cross-domain in Safari
+    sameSite: "none", // Must be 'none' for cross-domain in Safari
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
