@@ -4,10 +4,10 @@ dotenv.config();
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import session from "express-session";
-import passport, { configurePassport } from "./config/auth/passport"; // Ensure this is correctly configured
+import passport, { configurePassport } from "./config/auth/passport";
 import { sessionConfig } from "./config/auth/sessions";
 import * as crypto from "crypto";
-import type { User } from "./types/entities/User"; // Import the User interface
+import type { User } from "./types/entities/User";
 import pool from "./config/database";
 import { initializeDatabase } from "./config/schema";
 import helmet from "helmet";
@@ -36,6 +36,42 @@ requiredEnvVars.forEach((varName) => {
 // Configure Passport
 configurePassport();
 
+// Create different Helmet configurations for different browsers
+const safariHelmetConfig = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://apis.google.com", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", process.env.CLIENT_URL || ""],
+      imgSrc: ["'self'", "data:", "https://accounts.google.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      frameSrc: ["https://accounts.google.com"],
+      objectSrc: ["'none'"],
+      // No require-trusted-types-for directive for Safari
+    },
+  },
+});
+
+const standardHelmetConfig = helmet();
+
+// Apply the appropriate Helmet config based on browser detection
+app.use((req, res, next) => {
+  const userAgent = req.headers["user-agent"] || "";
+  const isSafari =
+    userAgent.includes("Safari") && !userAgent.includes("Chrome");
+
+  console.log(
+    `Browser detection: ${isSafari ? "Safari" : "Non-Safari"} browser`
+  );
+
+  if (isSafari) {
+    return safariHelmetConfig(req, res, next);
+  } else {
+    return standardHelmetConfig(req, res, next);
+  }
+});
+
 // Middleware
 app.use((req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
@@ -63,7 +99,7 @@ app.use((req, res, next) => {
           // No require-trusted-types-for directive for Safari
         },
       },
-    })(req, res, next);
+    })(req, res, next); // This is the issue - helmet() returns a middleware that needs to be called
   } else {
     // Default helmet for other browsers
     console.log("Non-Safari browser detected, applying standard CSP");
@@ -536,5 +572,3 @@ async function startServer() {
 if (process.env.NODE_ENV !== "test") {
   startServer(); // Only start server when not testing
 }
-
-export default app;
