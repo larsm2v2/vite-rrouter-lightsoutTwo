@@ -174,21 +174,28 @@ router.post("/validate", async (req: Request, res: Response) => {
   }
 
   try {
+    // This is the problem - your isDev check isn't working in Cloud Run
+    // Let's add more explicit checks and logging
+    const isDevEnvironment = process.env.NODE_ENV === "development";
+    console.log("Environment check:", {
+      NODE_ENV: process.env.NODE_ENV,
+      isDev: isDevEnvironment,
+    });
+
     // Fix the worker path resolution for both dev and production
     let workerPath;
-    if (isDev) {
+    if (isDevEnvironment) {
       // Development: Use TypeScript file
       workerPath = path.resolve(__dirname, "../utils/solverWorker.ts");
-      console.log("Dev worker path:", workerPath);
+      console.log("Using development path:", workerPath);
     } else {
       // Production: Use JavaScript file with correct path
-      // In Cloud Run, files are in /app/dist/
-      workerPath = path.resolve(process.cwd(), "./dist/utils/solverWorker.js");
-      console.log("Prod worker path:", workerPath);
+      workerPath = path.resolve(process.cwd(), "dist/utils/solverWorker.js");
+      console.log("Using production path:", workerPath);
     }
 
     // Only use ts-node in development
-    const workerOptions = isDev
+    const workerOptions = isDevEnvironment
       ? {
           execArgv: ["-r", "ts-node/register"],
           workerData: { pattern, size: 5, maxMoves: 25 },
@@ -197,7 +204,12 @@ router.post("/validate", async (req: Request, res: Response) => {
           workerData: { pattern, size: 5, maxMoves: 25 },
         };
 
-    console.log("Creating worker with path:", workerPath);
+    console.log(
+      "Creating worker with path:",
+      workerPath,
+      "isDev:",
+      isDevEnvironment
+    );
     const worker = new Worker(workerPath, workerOptions);
 
     const result: any = await new Promise((resolve, reject) => {
