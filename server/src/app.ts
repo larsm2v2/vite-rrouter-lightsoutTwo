@@ -72,40 +72,6 @@ app.use((req, res, next) => {
   }
 });
 
-// Middleware
-app.use((req, res, next) => {
-  const userAgent = req.headers["user-agent"] || "";
-  const isSafari =
-    userAgent.includes("Safari") && !userAgent.includes("Chrome");
-
-  if (isSafari) {
-    // Safari-compatible helmet config with more detailed logging
-    console.log("Safari detected, applying compatible CSP config");
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: [
-            "'self'",
-            "https://apis.google.com", // adjust for your OAuth2 provider
-            "'unsafe-inline'", // only if needed (e.g., for inline OAuth script snippets)
-          ],
-          styleSrc: ["'self'", "'unsafe-inline'"], // needed if you use inline styles
-          connectSrc: ["'self'", process.env.CLIENT_URL || ""],
-          imgSrc: ["'self'", "data:", "https://accounts.google.com"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
-          frameSrc: ["https://accounts.google.com"], // for Google OAuth
-          objectSrc: ["'none'"],
-          // No require-trusted-types-for directive for Safari
-        },
-      },
-    })(req, res, next); // This is the issue - helmet() returns a middleware that needs to be called
-  } else {
-    // Default helmet for other browsers
-    console.log("Non-Safari browser detected, applying standard CSP");
-    helmet()(req, res, next);
-  }
-});
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -572,3 +538,5 @@ async function startServer() {
 if (process.env.NODE_ENV !== "test") {
   startServer(); // Only start server when not testing
 }
+
+export default app;
