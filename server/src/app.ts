@@ -43,7 +43,8 @@ app.use((req, res, next) => {
     userAgent.includes("Safari") && !userAgent.includes("Chrome");
 
   if (isSafari) {
-    // Safari-compatible helmet config
+    // Safari-compatible helmet config with more detailed logging
+    console.log("Safari detected, applying compatible CSP config");
     helmet({
       contentSecurityPolicy: {
         directives: {
@@ -54,18 +55,18 @@ app.use((req, res, next) => {
             "'unsafe-inline'", // only if needed (e.g., for inline OAuth script snippets)
           ],
           styleSrc: ["'self'", "'unsafe-inline'"], // needed if you use inline styles
-          connectSrc: ["'self'", "https://your-api-endpoint.com"],
-          imgSrc: ["'self'", "data:", "https://your-image-cdn.com"],
+          connectSrc: ["'self'", process.env.CLIENT_URL || ""],
+          imgSrc: ["'self'", "data:", "https://accounts.google.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           frameSrc: ["https://accounts.google.com"], // for Google OAuth
           objectSrc: ["'none'"],
-          upgradeInsecureRequests: [],
-          // NO require-trusted-types-for
+          // No require-trusted-types-for directive for Safari
         },
       },
     })(req, res, next);
   } else {
     // Default helmet for other browsers
+    console.log("Non-Safari browser detected, applying standard CSP");
     helmet()(req, res, next);
   }
 });
@@ -81,6 +82,8 @@ app.use(
         "http://localhost:5174",
       ];
 
+      console.log(`CORS check for origin: ${origin}`);
+
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
@@ -89,8 +92,13 @@ app.use(
       }
     },
     credentials: true, // Required for cookies/sessions
-    methods: ["GET", "POST", "DELETE", "OPTIONS"],
-    exposedHeaders: ["Content-Type", "Authorization", "X-RateLimit-Reset"],
+    methods: ["GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"],
+    exposedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-RateLimit-Reset",
+      "Set-Cookie",
+    ],
   })
 );
 app.options("*", cors());
@@ -469,6 +477,26 @@ if (process.env.NODE_ENV === "test") {
     }
   );
 }
+
+// Test route for cookie debugging
+app.get("/test/cookie", (req, res) => {
+  // Set a test cookie
+  res.cookie("test-cookie", "hello", {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    httpOnly: true,
+  });
+
+  // Return info about the request
+  res.json({
+    cookies: req.cookies,
+    user: req.user ? { id: req.user.id, email: req.user.email } : null,
+    userAgent: req.headers["user-agent"],
+    isSafari:
+      req.headers["user-agent"]?.includes("Safari") &&
+      !req.headers["user-agent"]?.includes("Chrome"),
+  });
+});
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
