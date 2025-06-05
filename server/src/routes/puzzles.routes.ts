@@ -174,14 +174,31 @@ router.post("/validate", async (req: Request, res: Response) => {
   }
 
   try {
-    // Offload puzzle solving to a worker with a 15 sec timeout
-    const workerPath = isDev
-      ? path.resolve(__dirname, "../utils/solverWorker.ts") // dev (ts-node)
-      : path.resolve(__dirname, "../utils/solverWorker.js"); // prod (compiled JS)
-    const worker = new Worker(workerPath, {
-      execArgv: ["-r", "ts-node/register"],
-      workerData: { pattern, size: 5, maxMoves: 25 },
-    });
+    // Fix the worker path resolution for both dev and production
+    let workerPath;
+    if (isDev) {
+      // Development: Use TypeScript file
+      workerPath = path.resolve(__dirname, "../utils/solverWorker.ts");
+      console.log("Dev worker path:", workerPath);
+    } else {
+      // Production: Use JavaScript file with correct path
+      // In Cloud Run, files are in /app/dist/
+      workerPath = path.resolve(process.cwd(), "./dist/utils/solverWorker.js");
+      console.log("Prod worker path:", workerPath);
+    }
+
+    // Only use ts-node in development
+    const workerOptions = isDev
+      ? {
+          execArgv: ["-r", "ts-node/register"],
+          workerData: { pattern, size: 5, maxMoves: 25 },
+        }
+      : {
+          workerData: { pattern, size: 5, maxMoves: 25 },
+        };
+
+    console.log("Creating worker with path:", workerPath);
+    const worker = new Worker(workerPath, workerOptions);
 
     const result: any = await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
