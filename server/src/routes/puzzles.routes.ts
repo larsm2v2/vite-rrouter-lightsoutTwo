@@ -174,28 +174,41 @@ router.post("/validate", async (req: Request, res: Response) => {
   }
 
   try {
-    // This is the problem - your isDev check isn't working in Cloud Run
-    // Let's add more explicit checks and logging
-    const isDevEnvironment = process.env.NODE_ENV === "development";
-    console.log("Environment check:", {
-      NODE_ENV: process.env.NODE_ENV,
-      isDev: isDevEnvironment,
-    });
+    // Import fs to check for file existence
+    const fs = require("fs");
 
-    // Fix the worker path resolution for both dev and production
+    // Try multiple paths in order of preference
+    const possiblePaths = [
+      // JS in production locations
+      path.resolve(process.cwd(), "dist/utils/solverWorker.js"),
+      path.resolve(process.cwd(), "utils/solverWorker.js"),
+      path.resolve(process.cwd(), "src/utils/solverWorker.js"),
+      // TS files for development
+      path.resolve(__dirname, "../utils/solverWorker.ts"),
+    ];
+
+    // Find the first path that exists
     let workerPath;
-    if (isDevEnvironment) {
-      // Development: Use TypeScript file
-      workerPath = path.resolve(__dirname, "../utils/solverWorker.ts");
-      console.log("Using development path:", workerPath);
-    } else {
-      // Production: Use JavaScript file with correct path
-      workerPath = path.resolve(process.cwd(), "dist/utils/solverWorker.js");
-      console.log("Using production path:", workerPath);
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        workerPath = p;
+        console.log(`Found solver at: ${workerPath}`);
+        break;
+      }
     }
 
-    // Only use ts-node in development
-    const workerOptions = isDevEnvironment
+    if (!workerPath) {
+      console.error(
+        "Could not find solverWorker file at any expected location"
+      );
+      throw new Error("Solver not found");
+    }
+
+    // Determine if we need ts-node based on the file extension
+    const needsTsNode = workerPath.endsWith(".ts");
+
+    // Configure worker options based on the file type
+    const workerOptions = needsTsNode
       ? {
           execArgv: ["-r", "ts-node/register"],
           workerData: { pattern, size: 5, maxMoves: 25 },
@@ -205,10 +218,7 @@ router.post("/validate", async (req: Request, res: Response) => {
         };
 
     console.log(
-      "Creating worker with path:",
-      workerPath,
-      "isDev:",
-      isDevEnvironment
+      `Creating worker with path: ${workerPath}, needsTsNode: ${needsTsNode}`
     );
     const worker = new Worker(workerPath, workerOptions);
 
