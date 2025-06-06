@@ -45,12 +45,14 @@ const safariHelmetConfig = helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'", process.env.CLIENT_URL || ""],
       imgSrc: ["'self'", "data:", "https://accounts.google.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      fontSrc: ["'self'", ":", "https://fonts.gstatic.com"],
       frameSrc: ["https://accounts.google.com"],
       objectSrc: ["'none'"],
       // No require-trusted-types-for directive for Safari
+      upgradeInsecureRequests: [],
     },
   },
+  crossOriginEmbedderPolicy: false,
 });
 
 const standardHelmetConfig = helmet();
@@ -326,7 +328,7 @@ app.get("/sample-stats", (req, res) => {
 app.post("/auth/logout", (req: Request, res: Response) => {
   req.logout(() => {
     req.session?.destroy(() => {
-      res.clearCookie("connect.sid");
+      res.clearCookie("sessionId");
       res.json({ success: true });
     });
   });
