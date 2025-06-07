@@ -61,16 +61,21 @@ const Login = () => {
           setLoading(false);
           setAuthChecked(true);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Only update state if component is still mounted and error isn't from cancellation
         if (
           isActive &&
+          typeof error === "object" &&
+          error !== null &&
+          // @ts-expect-error: dynamic property access
           error.name !== "CanceledError" &&
+          // @ts-expect-error: dynamic property access
           error.code !== "ERR_CANCELED"
         ) {
           console.error("Auth check failed:", error);
 
           // Handle connection errors specially
+          // @ts-expect-error: dynamic property access
           if (error.isConnectionError) {
             setError(
               "Cannot connect to server. Please ensure the server is running at http://localhost:8000"
@@ -130,24 +135,43 @@ const Login = () => {
       if (response.status === 200) {
         navigate("/profile");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login failed:", error);
 
       // More detailed error reporting
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        console.error("Response headers:", error.response.headers);
+      if (typeof error === "object" && error !== null && "response" in error) {
+        const err = error as {
+          response: {
+            data: { message?: string };
+            status: number;
+            headers: Record<string, unknown>;
+          };
+        };
+        console.error("Response data:", err.response.data);
+        console.error("Response status:", err.response.status);
+        console.error("Response headers:", err.response.headers);
         setFormError(
-          error.response.data.message ||
+          err.response.data.message ||
             "Login failed. Please check your credentials."
         );
-      } else if (error.request) {
-        console.error("No response received:", error.request);
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "request" in error
+      ) {
+        const err = error as { request: unknown };
+        console.error("No response received:", err.request);
         setFormError("No response from server. Please try again later.");
-      } else {
-        console.error("Error during request setup:", error.message);
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error
+      ) {
+        const err = error as { message: string };
+        console.error("Error during request setup:", err.message);
         setFormError("Error setting up request. Please try again.");
+      } else {
+        setFormError("An unknown error occurred.");
       }
     } finally {
       setLoading(false);
@@ -194,24 +218,42 @@ const Login = () => {
         // No need to login separately - server already logs us in
         navigate("/profile");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Registration failed:", error);
 
       // More detailed error reporting
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-        console.error("Response headers:", error.response.headers);
+      if (typeof error === "object" && error !== null && "response" in error) {
+        const err = error as {
+          response: {
+            data: { message?: string };
+            status: number;
+            headers: Record<string, unknown>;
+          };
+        };
+        console.error("Response data:", err.response.data);
+        console.error("Response status:", err.response.status);
+        console.error("Response headers:", err.response.headers);
         setFormError(
-          error.response.data.message ||
-            "Registration failed. Please try again."
+          err.response.data.message || "Registration failed. Please try again."
         );
-      } else if (error.request) {
-        console.error("No response received:", error.request);
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "request" in error
+      ) {
+        const err = error as { request: unknown };
+        console.error("No response received:", err.request);
         setFormError("No response from server. Please try again later.");
-      } else {
-        console.error("Error during request setup:", error.message);
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error
+      ) {
+        const err = error as { message: string };
+        console.error("Error during request setup:", err.message);
         setFormError("Error setting up request. Please try again.");
+      } else {
+        setFormError("An unknown error occurred.");
       }
     } finally {
       setLoading(false);
