@@ -19,3 +19,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TTLO_TWO }}
           channelId: live
           projectId: ttlo-two
+          entryPoint: client/lightsoutTwo/firebase.json
