@@ -32,7 +32,22 @@ const Login = () => {
       );
     }
   }, []);
+  // Temporary debug
+  useEffect(() => {
+    console.log(
+      "API URL:",
+      import.meta.env.VITE_API_URL || "Not set (using fallback)"
+    );
+    console.log("Environment:", import.meta.env.MODE);
 
+    // Test API connection
+    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => console.log("API health check:", data))
+      .catch((err) => console.error("API health check failed:", err));
+  }, []);
   // Check if user is already authenticated
   useEffect(() => {
     // Don't create a new controller on every render
