@@ -195,6 +195,15 @@ app.get("/", (req: Request, res: Response) => {
   res.redirect(process.env.CLIENT_URL + "/login");
 });
 
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    env: process.env.NODE_ENV,
+    port: process.env.PORT || 8080,
+    clientUrl: process.env.CLIENT_URL,
+    timestamp: new Date().toISOString(),
+  });
+});
 // Protected routes
 app.get("/profile", async (req, res) => {
   // For tests, add debug logging
