@@ -543,7 +543,7 @@ async function ensureDatabaseInitialized() {
 // Start the server
 async function startServer() {
   await ensureDatabaseInitialized();
-  const PORT = process.env.PORT || 8000;
+  const PORT = process.env.PORT || 8080;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 if (process.env.NODE_ENV !== "test") {
