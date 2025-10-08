@@ -199,7 +199,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     env: process.env.NODE_ENV,
-    port: process.env.PORT || 8080,
+    port: process.env.PORT || 8000,
     clientUrl: process.env.CLIENT_URL,
     timestamp: new Date().toISOString(),
   });
@@ -543,7 +543,7 @@ async function ensureDatabaseInitialized() {
 // Start the server
 async function startServer() {
   await ensureDatabaseInitialized();
-  const PORT = process.env.PORT || 8080;
+  const PORT = process.env.PORT || 8000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 if (process.env.NODE_ENV !== "test") {
