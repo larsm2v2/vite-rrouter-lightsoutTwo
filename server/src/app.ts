@@ -74,35 +74,41 @@ app.use((req, res, next) => {
   }
 });
 
+const allowedOrigins = [
+  process.env.CLIENT_URL?.replace(/\/$/, ""),
+  "http://localhost:5173",
+  "http://localhost:5174",
+].filter(Boolean);
+
 app.use(
   cors({
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps, curl)
       if (!origin) return callback(null, true);
-
-      const allowedOrigins = [
-        process.env.CLIENT_URL,
-        "http://localhost:5173",
-        "http://localhost:5174",
-      ];
-
-      console.log(`CORS check for origin: ${origin}`);
-
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.log(`Origin ${origin} not allowed by CORS`);
-        callback(null, false);
-      }
+      const normalized = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(normalized)) return callback(null, true);
+      console.warn(`Blocked CORS origin: ${origin}`);
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true, // Required for cookies/sessions
     methods: ["GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Set-Cookie",
+    ],
     exposedHeaders: [
       "Content-Type",
       "Authorization",
       "X-RateLimit-Reset",
+      "X-Requested-With",
+      "Accept",
       "Set-Cookie",
     ],
+
+    optionsSuccessStatus: 204,
   })
 );
 app.options("*", cors());
