@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "./Client";
 import "./Login.css";
+import { API_URL } from "../auth/config";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,17 +17,12 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
-  const VITE_API_URL = import.meta.env.VITE_API_URL;
-
-  if (!VITE_API_URL && import.meta.env.PROD) {
+  if (!API_URL && import.meta.env.PROD) {
     // Fail fast so build/deploy will reveal missing env
     throw new Error(
-      "VITE_API_URL is not set. Ensure .env.production contains VITE_API_URL and rebuild."
+      "API_URL is not set. Ensure .env.production contains API_URL and rebuild."
     );
   }
-  const API_URL =
-    import.meta.env.VITE_API_URL ??
-    (import.meta.env.DEV ? "http://localhost:8000" : window.location.origin);
 
   // Check URL parameters for error
   useEffect(() => {
@@ -44,7 +40,7 @@ const Login = () => {
   useEffect(() => {
     console.log(
       "API URL:",
-      import.meta.env.VITE_API_URL || "Not set (using fallback)"
+      import.meta.env.API_URL || "Not set (using fallback)"
     );
     console.log("Environment:", import.meta.env.MODE);
 
@@ -55,7 +51,7 @@ const Login = () => {
       .then((res) => res.json())
       .then((data) => console.log("API health check:", data))
       .catch((err) => console.error("API health check failed:", err));
-  }, [VITE_API_URL, API_URL]);
+  }, []);
   // Check if user is already authenticated
   useEffect(() => {
     // Don't create a new controller on every render

@@ -4,8 +4,11 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
-        "source": "/auth/**",
-        "destination": "https://vite-rrouter-lightsouttwo-14001176047.us-central1.run.app/:splat"
+        "source": "/api/**",
+        "run": {
+          "serviceId": "vite-rrouter-lightsouttwo-14001176047",
+          "region": "us-central1"
+        }
       },
       {
         "source": "**",

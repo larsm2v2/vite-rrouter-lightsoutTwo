@@ -1,6 +1,6 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import apiClient from '../pages/Client';
+import { ReactNode, useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import apiClient from "../pages/Client";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -11,22 +11,29 @@ const authCache = {
   isAuthenticated: null as boolean | null,
   lastChecked: 0,
   // Cache valid for 5 minutes (300000ms)
-  expiryTime: 300000
+  expiryTime: 300000,
 };
 
 /**
  * A wrapper component that protects routes requiring authentication
  */
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(authCache.isAuthenticated);
-  const [isLoading, setIsLoading] = useState(authCache.isAuthenticated === null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(
+    authCache.isAuthenticated
+  );
+  const [isLoading, setIsLoading] = useState(
+    authCache.isAuthenticated === null
+  );
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
     // If we have a recent auth check in cache, use it
     const now = Date.now();
-    if (authCache.isAuthenticated !== null && now - authCache.lastChecked < authCache.expiryTime) {
+    if (
+      authCache.isAuthenticated !== null &&
+      now - authCache.lastChecked < authCache.expiryTime
+    ) {
       setIsAuthenticated(authCache.isAuthenticated);
       setIsLoading(false);
       return;
@@ -37,11 +44,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     const checkAuth = async () => {
       try {
-        const { data } = await apiClient.get('/auth/check', { 
+        const { data } = await apiClient.get("/auth/check", {
           withCredentials: true,
-          signal: controller.signal
+          signal: controller.signal,
         });
-        
+
         // Only update state if component is still mounted
         if (isActive) {
           // Update both component state and cache
@@ -50,18 +57,35 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           authCache.lastChecked = Date.now();
           setIsLoading(false);
         }
-      } catch (error: any) {
+      } catch (err: unknown) {
+        // Safely narrow unknown error to an object with expected optional fields
+        const errorObj =
+          typeof err === "object" && err !== null
+            ? (err as {
+                name?: string;
+                code?: string;
+                isConnectionError?: boolean;
+                message?: string;
+              })
+            : {};
+
         // Only handle error if component is still mounted and error isn't from cancellation
-        if (isActive && error.name !== 'CanceledError' && error.code !== 'ERR_CANCELED') {
-          console.error('Auth check failed:', error);
-          
+        if (
+          isActive &&
+          errorObj.name !== "CanceledError" &&
+          errorObj.code !== "ERR_CANCELED"
+        ) {
+          console.error("Auth check failed:", err);
+
           // Clear cache on error
           authCache.isAuthenticated = false;
           authCache.lastChecked = Date.now();
-          
-          setError(error.isConnectionError 
-            ? 'Cannot connect to server'
-            : 'Authentication check failed');
+
+          setError(
+            errorObj.isConnectionError
+              ? "Cannot connect to server"
+              : "Authentication check failed"
+          );
           setIsAuthenticated(false);
           setIsLoading(false);
         }
@@ -101,4 +125,4 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   return <>{children}</>;
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

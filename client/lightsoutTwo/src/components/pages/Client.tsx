@@ -1,13 +1,11 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { API_URL } from "../auth/config";
 
 export interface ApiResponse<T> {
   data: T;
   status: number;
   statusText: string;
 }
-
-// Get the API URL from environment variables or use default
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 // Create a typed wrapper around Axios
 const apiClient: AxiosInstance = axios.create({
