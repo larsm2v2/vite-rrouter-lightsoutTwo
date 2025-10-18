@@ -111,7 +111,25 @@ app.use(
     optionsSuccessStatus: 204,
   })
 );
-app.options("*", cors());
+app.options("*", (req, res) => {
+  const origin = req.header("origin") || "";
+  const normalized = origin.replace(/\/$/, "");
+  if (origin && allowedOrigins.includes(normalized)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader("Vary", "Origin");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type,Authorization,X-Requested-With,Accept,Set-Cookie"
+  );
+  return res.sendStatus(204);
+});
+
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
