@@ -16,6 +16,14 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
+  const VITE_API_URL = import.meta.env.VITE_API_URL;
+
+  if (!VITE_API_URL && import.meta.env.PROD) {
+    // Fail fast so build/deploy will reveal missing env
+    throw new Error(
+      "VITE_API_URL is not set. Ensure .env.production contains VITE_API_URL and rebuild."
+    );
+  }
   const API_URL =
     import.meta.env.VITE_API_URL ??
     (import.meta.env.DEV ? "http://localhost:8000" : window.location.origin);

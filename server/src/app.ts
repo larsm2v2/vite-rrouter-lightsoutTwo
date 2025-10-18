@@ -107,59 +107,72 @@ app.use((req, res, next) => {
 
 const allowedOrigins = [
   process.env.CLIENT_URL?.replace(/\/$/, ""),
+  "https://ttlo-two.web.app",
   "http://localhost:5173",
   "http://localhost:5174",
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl)
-      if (!origin) return callback(null, true);
-      const normalized = origin.replace(/\/$/, "");
-      if (allowedOrigins.includes(normalized)) return callback(null, true);
-      console.warn(`Blocked CORS origin: ${origin}`);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true, // Required for cookies/sessions
-    methods: ["GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-      "Set-Cookie",
-    ],
-    exposedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-RateLimit-Reset",
-      "X-Requested-With",
-      "Accept",
-      "Set-Cookie",
-    ],
-
-    optionsSuccessStatus: 204,
-  })
-);
-app.options("*", (req, res) => {
-  const origin = req.header("origin") || "";
-  const normalized = origin.replace(/\/$/, "");
-  if (origin && allowedOrigins.includes(normalized)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-  }
-  res.setHeader("Vary", "Origin");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type,Authorization,X-Requested-With,Accept,Set-Cookie"
-  );
-  return res.sendStatus(204);
+// Debug incoming origins from browsers
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "");
+  console.log("Incoming request Origin:", origin);
+  next();
 });
+
+const corsOptions = {
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) => {
+    // allow non-browser requests (no Origin header)
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/$/, "");
+    const allowed = allowedOrigins.includes(normalized);
+    console.log("CORS check:", { origin, normalized, allowed });
+    if (allowed) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Set-Cookie",
+  ],
+  exposedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-RateLimit-Reset",
+    "X-Requested-With",
+    "Accept",
+    "Set-Cookie",
+  ],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+
+app.options("*", cors(corsOptions));
+// app.options("*", (req, res) => {
+//   const origin = req.header("origin") || "";
+//   const normalized = origin.replace(/\/$/, "");
+//   if (origin && allowedOrigins.includes(normalized)) {
+//     res.setHeader("Access-Control-Allow-Origin", origin);
+//     res.setHeader("Access-Control-Allow-Credentials", "true");
+//   }
+//   res.setHeader("Vary", "Origin");
+//   res.setHeader(
+//     "Access-Control-Allow-Methods",
+//     "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+//   );
+//   res.setHeader(
+//     "Access-Control-Allow-Headers",
+//     "Content-Type,Authorization,X-Requested-With,Accept,Set-Cookie"
+//   );
+//   return res.sendStatus(204);
+// });
 
 app.use(
   rateLimit({
