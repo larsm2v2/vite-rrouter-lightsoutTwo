@@ -78,30 +78,40 @@ app.use((req, res, next) => {
 
 // Strip unsupported CSP directives for browsers that don't know them (Safari)
 app.use((req, res, next) => {
-  const userAgent = req.headers["user-agent"] || "";
-  const isSafari =
-    typeof userAgent === "string" &&
-    userAgent.includes("Safari") &&
-    !userAgent.includes("Chrome");
+  try {
+    const ua = String(req.get("user-agent") || "");
+    const origin = String(req.get("origin") || "");
+    const isSafari = ua.includes("Safari") && !ua.includes("Chrome");
 
-  // let downstream handlers set headers first
-  res.once && res.once("finish", () => {}); // no-op to ensure listener present in some envs
-  // run after headers are set by helmet — use setImmediate in case helmet sets header synchronously
-  setImmediate(() => {
+    // Debug — will help confirm exact Origin/UA values in Cloud Run logs
+    console.log("Request UA:", ua);
+    console.log("Request Origin:", origin);
+
+    // Read the CSP set by Helmet (if any)
     const headerName = "content-security-policy";
-    const header = res.getHeader(headerName) as string | string[] | undefined;
-    if (!header || !isSafari) return;
-    const csp = Array.isArray(header) ? header.join("; ") : String(header);
-    // Remove any require-trusted-types-for directives (and variants)
-    const cleaned = csp
-      .replace(/;?\s*require-trusted-types-for[^;]*/gi, "")
-      .trim();
-    if (cleaned) {
-      res.setHeader(headerName, cleaned);
-    } else {
-      res.removeHeader(headerName);
+    const headerValue = res.getHeader(headerName) as
+      | string
+      | string[]
+      | undefined;
+
+    if (headerValue && isSafari) {
+      const csp = Array.isArray(headerValue)
+        ? headerValue.join("; ")
+        : String(headerValue);
+      // Remove `require-trusted-types-for` (and any trailing token) for Safari
+      const cleaned = csp
+        .replace(/;?\s*require-trusted-types-for[^;]*/gi, "")
+        .trim();
+      if (cleaned) {
+        res.setHeader(headerName, cleaned);
+      } else {
+        res.removeHeader(headerName);
+      }
     }
-  });
+  } catch (err) {
+    // don't throw here — log and continue
+    console.warn("Header-cleanup middleware error:", err);
+  }
   next();
 });
 
