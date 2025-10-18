@@ -55,7 +55,7 @@ const Login = () => {
       .then((res) => res.json())
       .then((data) => console.log("API health check:", data))
       .catch((err) => console.error("API health check failed:", err));
-  }, []);
+  }, [VITE_API_URL, API_URL]);
   // Check if user is already authenticated
   useEffect(() => {
     // Don't create a new controller on every render

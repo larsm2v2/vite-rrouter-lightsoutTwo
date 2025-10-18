@@ -184,6 +184,41 @@ app.options("*", cors(corsOptions));
 //   return res.sendStatus(204);
 // });
 
+// Ensure this runs after cors() but before your route handlers
+app.use((req, res, next) => {
+  try {
+    const origin = String(req.get("origin") || "");
+    const normalized = origin.replace(/\/$/, "");
+    const allowedOrigins = [
+      process.env.CLIENT_URL?.replace(/\/$/, ""),
+      "https://ttlo-two.web.app",
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ].filter(Boolean);
+
+    if (origin && allowedOrigins.includes(normalized)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Vary", "Origin");
+    }
+
+    // For preflight requests, set required headers and end early
+    if (req.method === "OPTIONS") {
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+      );
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type,Authorization,X-Requested-With,Accept,Set-Cookie"
+      );
+      return res.status(204).end();
+    }
+  } catch (err) {
+    console.warn("Sync CORS middleware error:", err);
+  }
+  next();
+});
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
