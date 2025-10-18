@@ -61,7 +61,9 @@ const standardHelmetConfig = helmet();
 app.use((req, res, next) => {
   const userAgent = req.headers["user-agent"] || "";
   const isSafari =
-    userAgent.includes("Safari") && !userAgent.includes("Chrome");
+    typeof userAgent === "string" &&
+    userAgent.includes("Safari") &&
+    !userAgent.includes("Chrome");
 
   console.log(
     `Browser detection: ${isSafari ? "Safari" : "Non-Safari"} browser`
@@ -72,6 +74,35 @@ app.use((req, res, next) => {
   } else {
     return standardHelmetConfig(req, res, next);
   }
+});
+
+// Strip unsupported CSP directives for browsers that don't know them (Safari)
+app.use((req, res, next) => {
+  const userAgent = req.headers["user-agent"] || "";
+  const isSafari =
+    typeof userAgent === "string" &&
+    userAgent.includes("Safari") &&
+    !userAgent.includes("Chrome");
+
+  // let downstream handlers set headers first
+  res.once && res.once("finish", () => {}); // no-op to ensure listener present in some envs
+  // run after headers are set by helmet — use setImmediate in case helmet sets header synchronously
+  setImmediate(() => {
+    const headerName = "content-security-policy";
+    const header = res.getHeader(headerName) as string | string[] | undefined;
+    if (!header || !isSafari) return;
+    const csp = Array.isArray(header) ? header.join("; ") : String(header);
+    // Remove any require-trusted-types-for directives (and variants)
+    const cleaned = csp
+      .replace(/;?\s*require-trusted-types-for[^;]*/gi, "")
+      .trim();
+    if (cleaned) {
+      res.setHeader(headerName, cleaned);
+    } else {
+      res.removeHeader(headerName);
+    }
+  });
+  next();
 });
 
 const allowedOrigins = [

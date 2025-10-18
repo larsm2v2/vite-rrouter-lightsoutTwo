@@ -41,7 +41,7 @@ const Login = () => {
     console.log("Environment:", import.meta.env.MODE);
 
     // Test API connection
-    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, {
+    fetch(`${API_URL}/health`, {
       credentials: "include",
     })
       .then((res) => res.json())
