@@ -21,14 +21,14 @@ steps:
     args: [
         "build",
         "-t",
-        "gcr.io/$PROJECT_ID/lightsout-server",
+        "gcr.io/$PROJECT_ID/vite-rrouter-lightsouttwo",
         ".", # Context is inside server
       ]
 
   # 2. Push Docker image to GCR
   - name: "gcr.io/cloud-builders/docker"
     id: "docker-push"
-    args: ["push", "gcr.io/$PROJECT_ID/lightsout-server"]
+    args: ["push", "gcr.io/$PROJECT_ID/vite-rrouter-lightsouttwo"]
 
   # 3. Deploy to Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
@@ -38,20 +38,22 @@ steps:
       [
         "run",
         "deploy",
-        "lightsout-server",
+        "vite-rrouter-lightsouttwo-14001176047",
         "--image",
-        "gcr.io/$PROJECT_ID/lightsout-server",
+        "gcr.io/$PROJECT_ID/vite-rrouter-lightsouttwo",
         "--region",
         "us-central1",
         "--platform",
         "managed",
-        "--port",
-        "8000",
         "--allow-unauthenticated",
+        "--project",
+        "$PROJECT_ID",
+        "--port",
+        "8080",
       ]
 
 images:
-  - "gcr.io/$PROJECT_ID/lightsout-server"
+  - "gcr.io/$PROJECT_ID/vite-rrouter-lightsouttwo"
 
 options:
   machineType: "E2_HIGHCPU_8"
