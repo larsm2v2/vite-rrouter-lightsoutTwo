@@ -6,7 +6,7 @@
       {
         "source": "/api/**",
         "run": {
-          "serviceId": "vite-rrouter-lightsouttwo-14001176047",
+          "serviceId": "ttlotwopointzero",
           "region": "us-central1"
         }
       },
