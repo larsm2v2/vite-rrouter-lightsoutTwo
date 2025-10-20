@@ -655,10 +655,22 @@ async function ensureDatabaseInitialized() {
 
 // Start the server
 async function startServer() {
-  await ensureDatabaseInitialized();
-  const PORT = process.env.PORT || 8000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // bind to the Cloud Run provided PORT immediately (fallback 8080)
+  const PORT = Number(process.env.PORT) || 8000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log("process.env.PORT:", process.env.PORT);
+  });
+  ensureDatabaseInitialized()
+    .then(() => console.log("Database ensured/initialized"))
+    .catch((err) =>
+      console.error(
+        "Database initialization error (non-fatal at startup):",
+        err
+      )
+    );
 }
+
 if (process.env.NODE_ENV !== "test") {
   startServer(); // Only start server when not testing
 }

@@ -24,20 +24,23 @@ WORKDIR /app
 # Non-root user
 RUN chown -R node:node /app
 USER node
+ENV NODE_ENV=production
 # Copy only necessary files from builder
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 
 # Install only production dependencies
-ENV NODE_ENV=production
+
 RUN npm ci --no-cache --omit=dev
 
 
 # Environment variables will come from docker-compose or .env
-# Healthcheck (adjust endpoint if needed)
+# Healthcheck (adjust endpoint if needed)\
+
+EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s \
   CMD curl -f http://localhost:8000/health || exit 1
-EXPOSE 8000
+
 
 # Start the server
 CMD ["node", "dist/app.js"]

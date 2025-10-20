@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "./Client";
 import "./Login.css";
-import { API_URL } from "../auth/config";
+import API_URL from "../auth/config";
 
 const Login = () => {
   const navigate = useNavigate();
