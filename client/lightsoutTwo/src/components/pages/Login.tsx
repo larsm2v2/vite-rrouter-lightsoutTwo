@@ -38,11 +38,12 @@ const Login = () => {
   }, []);
   // Temporary debug
   useEffect(() => {
+    console.log("API URL (from config):", API_URL);
     console.log(
-      "API URL:",
-      import.meta.env.API_URL || "Not set (using fallback)"
+      "VITE_API_URL (build):",
+      import.meta.env.VITE_API_URL ?? "unset"
     );
-    console.log("Environment:", import.meta.env.MODE);
+    console.log("PROD (build):", import.meta.env.PROD ?? "false");
 
     // Test API connection
     fetch(`${API_URL}/health`, {

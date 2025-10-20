@@ -459,6 +459,8 @@ apiRouter.get("/profile", async (req, res) => {
 
 apiRouter.get("/auth/check", (req, res) => {
   if (!req.user) {
+    console.log("Full Request: ", req);
+    console.log("Requested User: ", req.user);
     return res.status(200).json({ authenticated: false });
   }
 
