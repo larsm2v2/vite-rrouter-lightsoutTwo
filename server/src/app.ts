@@ -317,6 +317,15 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    env: process.env.NODE_ENV,
+    port: process.env.PORT || 8080,
+    clientUrl: process.env.CLIENT_URL || null,
+    timestamp: new Date().toISOString(),
+  });
+});
 // Protected routes
 app.get("/profile", async (req, res) => {
   // For tests, add debug logging
