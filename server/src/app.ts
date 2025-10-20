@@ -261,6 +261,47 @@ const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
+
+app.get("/", (req: Request, res: Response) => {
+  res.redirect(process.env.CLIENT_URL + "/login");
+});
+
+apiRouter.get("/__routes", (_req, res) => {
+  try {
+    const routes: string[] = [];
+    // inspect stack to enumerate routes and methods
+    (apiRouter as any).stack.forEach((layer: any) => {
+      if (layer.route && layer.route.path) {
+        const methods = Object.keys(layer.route.methods)
+          .map((m) => m.toUpperCase())
+          .join(",");
+        routes.push(`${methods} /api${layer.route.path}`);
+      } else if (
+        layer.name === "router" &&
+        layer.handle &&
+        layer.handle.stack
+      ) {
+        // nested routers (e.g. authRoutes)
+        layer.handle.stack.forEach((l: any) => {
+          if (l.route && l.route.path) {
+            const methods = Object.keys(l.route.methods)
+              .map((m: string) => m.toUpperCase())
+              .join(",");
+            routes.push(
+              `${methods} /api${layer.regexp?.toString() || ""}${l.route.path}`
+            );
+          }
+        });
+      }
+    });
+    res.json({ routes });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "failed to enumerate routes", details: String(err) });
+  }
+});
+
 //Audit Log
 app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
@@ -308,6 +349,44 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.get("/", (req: Request, res: Response) => {
   res.redirect(process.env.CLIENT_URL + "/login");
 });
+
+apiRouter.get("/__routes", (_req, res) => {
+  try {
+    const routes: string[] = [];
+    // inspect stack to enumerate routes and methods
+    (apiRouter as any).stack.forEach((layer: any) => {
+      if (layer.route && layer.route.path) {
+        const methods = Object.keys(layer.route.methods)
+          .map((m) => m.toUpperCase())
+          .join(",");
+        routes.push(`${methods} /api${layer.route.path}`);
+      } else if (
+        layer.name === "router" &&
+        layer.handle &&
+        layer.handle.stack
+      ) {
+        // nested routers (e.g. authRoutes)
+        layer.handle.stack.forEach((l: any) => {
+          if (l.route && l.route.path) {
+            const methods = Object.keys(l.route.methods)
+              .map((m: string) => m.toUpperCase())
+              .join(",");
+            routes.push(
+              `${methods} /api${layer.regexp?.toString() || ""}${l.route.path}`
+            );
+          }
+        });
+      }
+    });
+    res.json({ routes });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "failed to enumerate routes", details: String(err) });
+  }
+});
+
+apiRouter.use("/auth", authRoutes);
 
 // Health and API routes moved to apiRouter so hosting rewrites to /api/* work
 apiRouter.get("/health", (req, res) => {
