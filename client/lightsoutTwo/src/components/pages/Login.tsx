@@ -97,7 +97,7 @@ const Login = () => {
           // @ts-expect-error: dynamic property access
           if (error.isConnectionError) {
             setError(
-              "Cannot connect to server. Please ensure the server is running at http://localhost:8000"
+              "Cannot connect to server. Please ensure the server is running at http://localhost:8080"
             );
           } else {
             // Handle other errors

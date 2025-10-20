@@ -312,7 +312,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     env: process.env.NODE_ENV,
-    port: process.env.PORT || 8000,
+    port: process.env.PORT || 8080,
     clientUrl: process.env.CLIENT_URL,
     timestamp: new Date().toISOString(),
   });
