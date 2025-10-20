@@ -5,7 +5,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (use package.json + package-lock.json for caching)
-COPY package*.json ./
+COPY package*.json tsconfig.json ./
 RUN npm ci  --no-cache
 
 # Copy the rest of your source code
@@ -37,9 +37,9 @@ RUN npm ci --no-cache --omit=dev
 # Environment variables will come from docker-compose or .env
 # Healthcheck (adjust endpoint if needed)\
 
-EXPOSE 8000
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8000/health || exit 1
+  CMD curl -f http://localhost:8080/health || exit 1
 
 
 # Start the server

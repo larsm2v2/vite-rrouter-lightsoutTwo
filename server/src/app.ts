@@ -656,7 +656,7 @@ async function ensureDatabaseInitialized() {
 // Start the server
 async function startServer() {
   // bind to the Cloud Run provided PORT immediately (fallback 8080)
-  const PORT = Number(process.env.PORT) || 8000;
+  const PORT = Number(process.env.PORT) || 8080;
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log("process.env.PORT:", process.env.PORT);
