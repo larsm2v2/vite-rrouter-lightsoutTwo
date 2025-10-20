@@ -58,7 +58,7 @@ const safariHelmetConfig = helmet({
 const standardHelmetConfig = helmet();
 
 // Apply the appropriate Helmet config based on browser detection
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const userAgent = req.headers["user-agent"] || "";
   const isSafari =
     typeof userAgent === "string" &&
@@ -77,7 +77,7 @@ app.use((req, res, next) => {
 });
 
 // Strip unsupported CSP directives for browsers that don't know them (Safari)
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   try {
     const ua = String(req.get("user-agent") || "");
     const origin = String(req.get("origin") || "");
@@ -123,7 +123,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Debug incoming origins from browsers
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = String(req.headers.origin || "");
   console.log("Incoming request Origin:", origin);
   next();
@@ -185,7 +185,7 @@ app.options("*", cors(corsOptions));
 // });
 
 // Ensure this runs after cors() but before your route handlers
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   try {
     const origin = String(req.get("origin") || "");
     const normalized = origin.replace(/\/$/, "");
@@ -237,20 +237,21 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Add request logger middleware
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
   console.log("Headers:", req.headers);
   next();
 });
-
+const apiRouter = express.Router();
+app.use("/api", apiRouter);
 // Mount auth routes
-app.use("/auth", authRoutes);
+apiRouter.use("/auth", authRoutes);
 
 // Mount puzzle routes
-app.use("/puzzles", puzzleRoutes);
+apiRouter.use("/puzzles", puzzleRoutes);
 
 // Mount profile routes
-app.use("/profile", profileRoutes);
+apiRouter.use("/profile", profileRoutes);
 
 // Google OAuth Configuration
 const GOOGLE_OAUTH_URL = process.env.GOOGLE_OAUTH_URL;
@@ -308,7 +309,8 @@ app.get("/", (req: Request, res: Response) => {
   res.redirect(process.env.CLIENT_URL + "/login");
 });
 
-app.get("/health", (req, res) => {
+// Health and API routes moved to apiRouter so hosting rewrites to /api/* work
+apiRouter.get("/health", (req, res) => {
   res.json({
     status: "ok",
     env: process.env.NODE_ENV,
@@ -317,17 +319,9 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    env: process.env.NODE_ENV,
-    port: process.env.PORT || 8080,
-    clientUrl: process.env.CLIENT_URL || null,
-    timestamp: new Date().toISOString(),
-  });
-});
+
 // Protected routes
-app.get("/profile", async (req, res) => {
+apiRouter.get("/profile", async (req, res) => {
   // For tests, add debug logging
   if (process.env.NODE_ENV === "test") {
     console.log("Profile request:", {
@@ -384,8 +378,7 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-app.get("/auth/check", (req, res) => {
-  // res.json({ authenticated: !!req.user });
+apiRouter.get("/auth/check", (req, res) => {
   if (!req.user) {
     return res.status(200).json({ authenticated: false });
   }
@@ -401,15 +394,15 @@ app.get("/auth/check", (req, res) => {
   });
 });
 
-app.get("/user", (req, res) => {
+apiRouter.get("/user", (req, res) => {
   if (!req.user) {
-    res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Unauthorized" });
   }
   res.json(req.user);
 });
 
 // Stats endpoint with validation
-app.get(
+apiRouter.get(
   "/stats/:userId",
   param("userId").isInt().toInt(),
   async (req: Request, res: Response) => {
@@ -440,14 +433,14 @@ app.get(
   }
 );
 // Logout Route
-app.get("/logout", (req, res) => {
+apiRouter.get("/logout", (req, res) => {
   req.logout(() => {
     res.redirect("/");
   });
 });
 
-app.get("/sample-stats", (req, res) => {
-  if (!req.user) res.status(401).json({ error: "Unauthorized" });
+apiRouter.get("/sample-stats", (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
 
   res.json({
     current_level: 5,
@@ -456,7 +449,7 @@ app.get("/sample-stats", (req, res) => {
 });
 
 // Enhanced logout
-app.post("/auth/logout", (req: Request, res: Response) => {
+apiRouter.post("/auth/logout", (req: Request, res: Response) => {
   req.logout(() => {
     req.session?.destroy(() => {
       res.clearCookie("sessionId");
@@ -465,7 +458,7 @@ app.post("/auth/logout", (req: Request, res: Response) => {
   });
 });
 
-app.post("/game/progress", async (req: Request, res: Response) => {
+apiRouter.post("/game/progress", async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
 
   try {
@@ -647,7 +640,7 @@ const authRateLimiter = rateLimit({
     );
   },
 });
-app.use(authRateLimiter);
+apiRouter.use(authRateLimiter);
 
 async function ensureDatabaseInitialized() {
   try {
