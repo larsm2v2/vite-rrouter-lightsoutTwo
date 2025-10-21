@@ -34,10 +34,13 @@ export const sessionConfig: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true, // Must be true for cross-domain in Safari
-    sameSite: "none", // Must be 'none' for cross-domain in Safari
+    secure: process.env.NODE_ENV === "production", // Must be true for cross-domain in Safari
+    sameSite: "lax", // Must be 'none' for cross-domain in Safari
     httpOnly: true,
-    domain: process.env.COOKIE_DOMAIN || undefined,
+    domain:
+      process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN
+        ? process.env.COOKIE_DOMAIN
+        : undefined,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
   name: "sessionId", // Custom session cookie name

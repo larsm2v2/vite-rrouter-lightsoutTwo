@@ -244,6 +244,26 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 const apiRouter = express.Router();
 app.use("/api", apiRouter);
+
+apiRouter.use((req, res, next) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, private, must-revalidate"
+  );
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
+
+apiRouter.use((req, _res, next) => {
+  console.log("cookie header:", req.headers.cookie);
+  console.log(
+    "sessionID:",
+    (req as any).sessionID,
+    "req.user:",
+    (req as any).user
+  );
+  next();
+});
 // Mount auth routes
 apiRouter.use("/auth", authRoutes);
 
@@ -264,42 +284,6 @@ const GOOGLE_OAUTH_SCOPES = [
 
 app.get("/", (req: Request, res: Response) => {
   res.redirect(process.env.CLIENT_URL + "/login");
-});
-
-apiRouter.get("/__routes", (_req, res) => {
-  try {
-    const routes: string[] = [];
-    // inspect stack to enumerate routes and methods
-    (apiRouter as any).stack.forEach((layer: any) => {
-      if (layer.route && layer.route.path) {
-        const methods = Object.keys(layer.route.methods)
-          .map((m) => m.toUpperCase())
-          .join(",");
-        routes.push(`${methods} /api${layer.route.path}`);
-      } else if (
-        layer.name === "router" &&
-        layer.handle &&
-        layer.handle.stack
-      ) {
-        // nested routers (e.g. authRoutes)
-        layer.handle.stack.forEach((l: any) => {
-          if (l.route && l.route.path) {
-            const methods = Object.keys(l.route.methods)
-              .map((m: string) => m.toUpperCase())
-              .join(",");
-            routes.push(
-              `${methods} /api${layer.regexp?.toString() || ""}${l.route.path}`
-            );
-          }
-        });
-      }
-    });
-    res.json({ routes });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: "failed to enumerate routes", details: String(err) });
-  }
 });
 
 //Audit Log
