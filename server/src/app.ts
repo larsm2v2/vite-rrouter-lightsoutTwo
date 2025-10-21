@@ -219,15 +219,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
   next();
 });
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.path === "/auth/check",
-  })
-);
+
 app.use(express.json());
 // Add URL-encoded middleware to handle form data
 app.use(express.urlencoded({ extended: true }));
@@ -245,6 +237,21 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const apiRouter = express.Router();
 app.use("/api", apiRouter);
 
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 60, // Increased limit
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Explicitly return boolean (never undefined)
+    return (
+      req.path === "/auth/check" &&
+      req.method === "GET" &&
+      !!req.get("Referer")?.includes("/login")
+    );
+  },
+});
+apiRouter.use(authRateLimiter);
 apiRouter.use((req, res, next) => {
   res.setHeader(
     "Cache-Control",
@@ -281,10 +288,6 @@ const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
-
-app.get("/", (req: Request, res: Response) => {
-  res.redirect(process.env.CLIENT_URL + "/login");
-});
 
 //Audit Log
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -690,22 +693,6 @@ app.get("/test/cookie", (req, res) => {
       !req.headers["user-agent"]?.includes("Chrome"),
   });
 });
-
-const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 60, // Increased limit
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Explicitly return boolean (never undefined)
-    return (
-      req.path === "/auth/check" &&
-      req.method === "GET" &&
-      !!req.get("Referer")?.includes("/login")
-    );
-  },
-});
-apiRouter.use(authRateLimiter);
 
 async function ensureDatabaseInitialized() {
   try {
