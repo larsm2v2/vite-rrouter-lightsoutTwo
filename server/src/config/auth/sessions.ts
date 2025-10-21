@@ -35,7 +35,7 @@ export const sessionConfig: session.SessionOptions = {
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production", // Must be true for cross-domain in Safari
-    sameSite: "lax", // Must be 'none' for cross-domain in Safari
+    sameSite: process.env.COOKIE_DOMAIN ? "none" : "lax",
     httpOnly: true,
     domain:
       process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN

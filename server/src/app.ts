@@ -16,6 +16,7 @@ import puzzleRoutes from "./routes/puzzles.routes";
 import rateLimit from "express-rate-limit";
 import { param } from "express-validator";
 import profileRoutes from "./routes/profile";
+import cookieParser from "cookie-parser";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -221,6 +222,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(express.json());
+app.use(cookieParser());
 // Add URL-encoded middleware to handle form data
 app.use(express.urlencoded({ extended: true }));
 
@@ -237,6 +239,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const apiRouter = express.Router();
 app.use("/api", apiRouter);
 
+// DEBUG middleware — add only temporarily
+apiRouter.use((req, _res, next) => {
+  console.log("DEBUG sessionID:", (req as any).sessionID);
+  console.log("DEBUG req.session (summary):", {
+    hasSession: !!req.session,
+    keys: req.session ? Object.keys(req.session) : null,
+  });
+  console.log("DEBUG req.user:", !!(req as any).user);
+  next();
+});
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 60, // Increased limit
