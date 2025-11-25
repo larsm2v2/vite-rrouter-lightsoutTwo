@@ -35,15 +35,12 @@ export const sessionConfig: session.SessionOptions = {
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production",
-    // Use lax for same-origin (Firebase Hosting -> Cloud Run proxy)
-    sameSite: "lax",
+    sameSite: "lax", // Same-origin for Firebase Hosting -> Cloud Run proxy
     httpOnly: true,
-    // Don't set domain for same-origin cookies
-    domain: undefined,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
-  name: "connect.sid", // Use default session cookie name for compatibility
-  // Add test-specific configuration
+  name: "connect.sid",
+  // Test-specific overrides
   ...(process.env.NODE_ENV === "test" && {
     cookie: {
       secure: false,
@@ -51,7 +48,7 @@ export const sessionConfig: session.SessionOptions = {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
     },
-    resave: true, // Force save session for tests
-    saveUninitialized: true, // Save even uninitialized sessions in tests
+    resave: true,
+    saveUninitialized: true,
   }),
 };

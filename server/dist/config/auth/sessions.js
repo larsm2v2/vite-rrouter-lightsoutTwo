@@ -30,11 +30,8 @@ exports.sessionConfig = Object.assign({ store: process.env.NODE_ENV === "test"
             pruneSessionInterval: false,
         }), secret: process.env.SESSION_SECRET || "test-secret", resave: false, saveUninitialized: false, cookie: {
         secure: process.env.NODE_ENV === "production",
-        // Use lax for same-origin (Firebase Hosting -> Cloud Run proxy)
-        sameSite: "lax",
+        sameSite: "lax", // Same-origin for Firebase Hosting -> Cloud Run proxy
         httpOnly: true,
-        // Don't set domain for same-origin cookies
-        domain: undefined,
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
     }, name: "connect.sid" }, (process.env.NODE_ENV === "test" && {
     cookie: {
@@ -43,6 +40,6 @@ exports.sessionConfig = Object.assign({ store: process.env.NODE_ENV === "test"
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
     },
-    resave: true, // Force save session for tests
-    saveUninitialized: true, // Save even uninitialized sessions in tests
+    resave: true,
+    saveUninitialized: true,
 }));
