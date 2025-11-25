@@ -27,7 +27,7 @@ router.post("/test-body", (req, res) => {
     res.status(200).json({
         receivedBody: req.body,
         bodyKeys: Object.keys(req.body),
-        contentType: req.headers["content-type"]
+        contentType: req.headers["content-type"],
     });
 });
 // Initiate Google auth
@@ -44,7 +44,9 @@ router.get("/google", (req, res, next) => {
 router.get("/google/callback", (req, res, next) => {
     console.log("OAuth callback received:", {
         state: req.query.state,
-        code: typeof req.query.code === 'string' ? req.query.code.substring(0, 10) + "..." : req.query.code,
+        code: typeof req.query.code === "string"
+            ? req.query.code.substring(0, 10) + "..."
+            : req.query.code,
         error: req.query.error,
     });
     next();
@@ -79,7 +81,7 @@ router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, functio
         console.log("Registration request:", {
             email: email,
             hasPassword: !!password,
-            display_name: display_name
+            display_name: display_name,
         });
         // Basic validation
         if (!email) {
@@ -89,7 +91,7 @@ router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, functio
             return res.status(400).json({ message: "Password is required" });
         }
         // Use email as display name if not provided
-        const userDisplayName = display_name || email.split('@')[0];
+        const userDisplayName = display_name || email.split("@")[0];
         // Check if email already exists
         const emailCheckResult = yield database_1.default.query("SELECT * FROM users WHERE email = $1", [email]);
         if (emailCheckResult.rows.length > 0) {
@@ -113,8 +115,8 @@ router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, functio
                     user: {
                         id: user.id,
                         email: user.email,
-                        displayName: user.display_name
-                    }
+                        displayName: user.display_name,
+                    },
                 });
             }
             return res.status(201).json({
@@ -122,8 +124,8 @@ router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, functio
                 user: {
                     id: user.id,
                     email: user.email,
-                    displayName: user.display_name
-                }
+                    displayName: user.display_name,
+                },
             });
         });
     }
@@ -143,14 +145,18 @@ router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* 
             return res.status(400).json({ message: "Password is required" });
         }
         // Find user
-        const result = yield database_1.default.query("SELECT * FROM users WHERE email = $1", [email]);
+        const result = yield database_1.default.query("SELECT * FROM users WHERE email = $1", [
+            email,
+        ]);
         if (result.rows.length === 0) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
         const user = result.rows[0];
         // Check if this is a password-based account
         if (!user.password || !user.password_salt) {
-            return res.status(401).json({ message: "This account uses Google login" });
+            return res
+                .status(401)
+                .json({ message: "This account uses Google login" });
         }
         // Verify password
         const isMatch = yield (0, password_1.comparePassword)(password, user.password, user.password_salt);
@@ -168,13 +174,66 @@ router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 user: {
                     id: user.id,
                     email: user.email,
-                    displayName: user.display_name
-                }
+                    displayName: user.display_name,
+                },
             });
         });
     }
     catch (err) {
         console.error("Login error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}));
+// Demo mode for portfolio - instant access without signup
+router.post("/demo", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        console.log("Demo login request received");
+        // Find or create demo user
+        let demoUserResult = yield database_1.default.query("SELECT id, email, display_name FROM users WHERE email = $1", ["demo@portfolio.local"]);
+        let demoUser;
+        if (demoUserResult.rows.length === 0) {
+            console.log("Creating new demo user");
+            // Create demo user
+            const createResult = yield database_1.default.query(`INSERT INTO users (google_sub, email, display_name, password, password_salt) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id, email, display_name`, [null, "demo@portfolio.local", "Portfolio Demo User", null, null]);
+            demoUser = createResult.rows[0];
+            // Create game stats for demo user
+            yield database_1.default.query("INSERT INTO game_stats (user_id) VALUES ($1)", [
+                demoUser.id,
+            ]);
+            console.log("Demo user created with ID:", demoUser.id);
+        }
+        else {
+            demoUser = demoUserResult.rows[0];
+            console.log("Using existing demo user with ID:", demoUser.id);
+        }
+        // Log in the demo user and establish session
+        req.login(demoUser, (err) => {
+            if (err) {
+                console.error("Demo login error:", err);
+                return res.status(500).json({ message: "Demo mode failed" });
+            }
+            // Explicitly save session before responding
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    console.error("Session save error:", saveErr);
+                }
+                console.log("Demo login successful, sessionID:", req.sessionID);
+                return res.json({
+                    message: "Demo mode activated",
+                    user: {
+                        id: demoUser.id,
+                        email: demoUser.email,
+                        displayName: demoUser.display_name,
+                        isDemo: true,
+                    },
+                });
+            });
+        });
+    }
+    catch (err) {
+        console.error("Demo mode error:", err);
         return res.status(500).json({ message: "Internal server error" });
     }
 }));

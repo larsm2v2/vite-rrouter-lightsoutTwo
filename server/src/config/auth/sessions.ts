@@ -34,16 +34,15 @@ export const sessionConfig: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production", // Must be true for cross-domain in Safari
-    sameSite: process.env.COOKIE_DOMAIN ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+    // Use lax for same-origin (Firebase Hosting -> Cloud Run proxy)
+    sameSite: "lax",
     httpOnly: true,
-    domain:
-      process.env.NODE_ENV === "production" && process.env.COOKIE_DOMAIN
-        ? process.env.COOKIE_DOMAIN
-        : undefined,
+    // Don't set domain for same-origin cookies
+    domain: undefined,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
-  name: "sessionId", // Custom session cookie name
+  name: "connect.sid", // Use default session cookie name for compatibility
   // Add test-specific configuration
   ...(process.env.NODE_ENV === "test" && {
     cookie: {

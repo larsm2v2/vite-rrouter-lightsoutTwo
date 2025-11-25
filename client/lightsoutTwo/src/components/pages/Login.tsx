@@ -134,15 +134,23 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await apiClient.post("/auth/demo");
-      
+      const response = await apiClient.post(
+        "/auth/demo",
+        {},
+        {
+          withCredentials: true,
+        }
+      );
+
       if (response.status === 200 && response.data.user) {
-        // Navigate to profile after successful demo login
-        navigate("/profile");
+        // Force a full page reload to ensure session cookie is recognized
+        window.location.href = "/profile";
       }
     } catch (error: unknown) {
       console.error("Demo login failed:", error);
-      setFormError("Demo mode is currently unavailable. Please try again later.");
+      setFormError(
+        "Demo mode is currently unavailable. Please try again later."
+      );
     } finally {
       setLoading(false);
     }
@@ -380,7 +388,7 @@ const Login = () => {
                 <span className="demo-icon">🎮</span>
                 {loading ? "Please wait..." : "Try Demo (No Signup Required)"}
               </button>
-              
+
               <a
                 href={`${API_URL}/auth/google`}
                 className="provider-button google"
