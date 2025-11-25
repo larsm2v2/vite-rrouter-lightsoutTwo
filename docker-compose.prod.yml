@@ -9,7 +9,7 @@ services:
       - ./client/lightsoutTwo:/app # Sync client directory (dev mode)
       - /app/node_modules # Keep installed dependencies
     environment:
-      - VITE_API_URL=http://localhost:8000 # Points to 'server' container
+      - VITE_API_URL=http://localhost:8080 # Points to 'server' container
     command: npm run dev -- --host # Run dev server for client
     depends_on:
       - server # Ensure the server is up before client starts
@@ -38,7 +38,7 @@ services:
     depends_on:
       - postgres
     ports:
-      - "8000:8000" # Production port
+      - 8080:8080" # Production port
     restart: always # Auto-restart the container in production mode
 
 volumes:

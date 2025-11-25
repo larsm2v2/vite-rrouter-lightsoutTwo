@@ -15,7 +15,7 @@ server:
         - "CSRF_SECRET"
 
     ports:
-      - "8000:8000"   # Express default port
+      - "8080:8080"   # Express default port
     volumes:
       - ./server:/app  # Live code sync
       - /app/node_modules

@@ -9,7 +9,7 @@ services:
       - ./client/lightsoutTwo:/app # Sync client directory (dev mode)
       - /app/node_modules # Keep installed dependencies
     environment:
-      - VITE_API_URL=http://localhost:8000 # Points to 'server' container
+      - VITE_API_URL=http://localhost:8080 # Points to 'server' container
     command: npm run dev -- --host # Run dev server for client
     depends_on:
       - server # Ensure the server is up before client starts
@@ -18,7 +18,7 @@ services:
     build:
       context: ./server
     ports:
-      - "8000:8000" # Express default port
+      - "8080:8080" # Express default port
     volumes:
       - ./server:/app # Live code sync for dev
       - /app/node_modules # Keep dependencies (dev mode)
