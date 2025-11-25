@@ -129,6 +129,25 @@ const Login = () => {
     // The redirect will happen via the href
   };
 
+  const handleDemoLogin = async () => {
+    setFormError(null);
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post("/auth/demo");
+      
+      if (response.status === 200 && response.data.user) {
+        // Navigate to profile after successful demo login
+        navigate("/profile");
+      }
+    } catch (error: unknown) {
+      console.error("Demo login failed:", error);
+      setFormError("Demo mode is currently unavailable. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLocalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -352,6 +371,16 @@ const Login = () => {
             </div>
 
             <div className="oauth-providers">
+              <button
+                onClick={handleDemoLogin}
+                className="provider-button demo"
+                disabled={loading}
+                type="button"
+              >
+                <span className="demo-icon">🎮</span>
+                {loading ? "Please wait..." : "Try Demo (No Signup Required)"}
+              </button>
+              
               <a
                 href={`${API_URL}/auth/google`}
                 className="provider-button google"

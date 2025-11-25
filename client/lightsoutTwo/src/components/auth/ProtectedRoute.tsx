@@ -1,14 +1,23 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import apiClient from "../pages/Client";
+import DemoBanner from "../common/DemoBanner";
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
+// Define user type
+interface User {
+  id: number;
+  email: string;
+  display_name: string;
+}
+
 // Keep a cache of the last auth check to prevent constant rechecking
 const authCache = {
   isAuthenticated: null as boolean | null,
+  user: null as User | null,
   lastChecked: 0,
   // Cache valid for 5 minutes (300000ms)
   expiryTime: 300000,
@@ -21,6 +30,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(
     authCache.isAuthenticated
   );
+  const [user, setUser] = useState<User | null>(authCache.user);
   const [isLoading, setIsLoading] = useState(
     authCache.isAuthenticated === null
   );
@@ -35,6 +45,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       now - authCache.lastChecked < authCache.expiryTime
     ) {
       setIsAuthenticated(authCache.isAuthenticated);
+      setUser(authCache.user);
       setIsLoading(false);
       return;
     }
@@ -53,7 +64,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         if (isActive) {
           // Update both component state and cache
           setIsAuthenticated(data.authenticated);
+          setUser(data.user || null);
           authCache.isAuthenticated = data.authenticated;
+          authCache.user = data.user || null;
           authCache.lastChecked = Date.now();
           setIsLoading(false);
         }
@@ -79,6 +92,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
           // Clear cache on error
           authCache.isAuthenticated = false;
+          authCache.user = null;
           authCache.lastChecked = Date.now();
 
           setError(
@@ -121,8 +135,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If authenticated, render the protected content
-  return <>{children}</>;
+  // If authenticated, render the protected content with demo banner if applicable
+  return (
+    <>
+      {user?.email === "demo@portfolio.local" && <DemoBanner />}
+      {children}
+    </>
+  );
 };
 
 export default ProtectedRoute;
