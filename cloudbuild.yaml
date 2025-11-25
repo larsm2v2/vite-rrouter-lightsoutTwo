@@ -53,7 +53,7 @@ steps:
         "--set-secrets",
         "SESSION_SECRET=SESSION_SECRET:latest,DB_ENCRYPTION_KEY=DB_ENCRYPTION_KEY:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest",
         "--set-env-vars",
-        "NODE_ENV=production,PORT=8080,GOOGLE_CALLBACK_URL=https://ttlo-two.web.app/api/auth/google/callback,PG_USER=admin,PG_HOST=/cloudsql/ttlo-two:us-central1:ttlo-db,PG_DATABASE=lightsout,PG_PORT=5432",
+        "NODE_ENV=production,GOOGLE_CALLBACK_URL=https://ttlo-two.web.app/api/auth/google/callback,PG_USER=admin,PG_HOST=/cloudsql/ttlo-two:us-central1:ttlo-db,PG_DATABASE=lightsout,PG_PORT=5432",
         "--set-secrets",
         "PG_PASSWORD=PG_PASSWORD:latest",
         "--add-cloudsql-instances",
