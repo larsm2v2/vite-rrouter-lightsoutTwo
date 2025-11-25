@@ -30,10 +30,11 @@ exports.sessionConfig = Object.assign({ store: process.env.NODE_ENV === "test"
             pruneSessionInterval: false,
         }), secret: process.env.SESSION_SECRET || "test-secret", resave: false, saveUninitialized: false, cookie: {
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax", // Same-origin for Firebase Hosting -> Cloud Run proxy
+        sameSite: "lax",
         httpOnly: true,
+        path: "/", // Keep as root path for Firebase Hosting
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    }, name: "connect.sid" }, (process.env.NODE_ENV === "test" && {
+    }, name: "connect.sid", proxy: true }, (process.env.NODE_ENV === "test" && {
     cookie: {
         secure: false,
         sameSite: "lax",

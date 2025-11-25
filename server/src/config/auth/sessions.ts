@@ -35,11 +35,13 @@ export const sessionConfig: session.SessionOptions = {
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax", // Same-origin for Firebase Hosting -> Cloud Run proxy
+    sameSite: "lax",
     httpOnly: true,
+    path: "/", // Keep as root path for Firebase Hosting
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
   name: "connect.sid",
+  proxy: true, // Trust the proxy (Firebase Hosting)
   // Test-specific overrides
   ...(process.env.NODE_ENV === "test" && {
     cookie: {
