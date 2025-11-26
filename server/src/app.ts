@@ -17,6 +17,7 @@ import rateLimit from "express-rate-limit";
 import { param } from "express-validator";
 import profileRoutes from "./routes/profile";
 import cookieParser from "cookie-parser";
+import { authenticateJWT, requireAuth } from "./middleware/auth";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -226,9 +227,13 @@ app.use(cookieParser());
 // Add URL-encoded middleware to handle form data
 app.use(express.urlencoded({ extended: true }));
 
+// Keep session middleware for passport OAuth flow only
 app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Add JWT authentication middleware globally
+app.use(authenticateJWT);
 
 // Add request logger middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -398,20 +403,8 @@ apiRouter.get("/health", (req, res) => {
   });
 });
 
-// Protected routes
-apiRouter.get("/profile", async (req, res) => {
-  // For tests, add debug logging
-  if (process.env.NODE_ENV === "test") {
-    console.log("Profile request:", {
-      hasUser: !!req.user,
-      user: req.user,
-      sessionID: req.sessionID,
-      hasSession: !!req.session,
-    });
-  }
-
-  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-
+// Protected routes - use requireAuth middleware
+apiRouter.get("/profile", requireAuth, async (req, res) => {
   try {
     // Get user profile
     const userResult = await pool.query(
@@ -485,20 +478,16 @@ apiRouter.get("/auth/check", (req, res) => {
   });
 });
 
-apiRouter.get("/user", (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+apiRouter.get("/user", requireAuth, (req, res) => {
   res.json(req.user);
 });
 
 // Stats endpoint with validation
 apiRouter.get(
   "/stats/:userId",
+  requireAuth,
   param("userId").isInt().toInt(),
   async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-
     try {
       const stats = await pool.query(
         `SELECT 
@@ -525,14 +514,11 @@ apiRouter.get(
 );
 // Logout Route
 apiRouter.get("/logout", (req, res) => {
-  req.logout(() => {
-    res.redirect("/");
-  });
+  // With JWT, logout is client-side
+  res.json({ success: true, message: "Logout successful" });
 });
 
-apiRouter.get("/sample-stats", (req, res) => {
-  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-
+apiRouter.get("/sample-stats", requireAuth, (req, res) => {
   res.json({
     current_level: 5,
     leastMoves: 18,
@@ -541,84 +527,76 @@ apiRouter.get("/sample-stats", (req, res) => {
 
 // Enhanced logout
 apiRouter.post("/auth/logout", (req: Request, res: Response) => {
-  req.logout(() => {
-    req.session?.destroy(() => {
-      // Use correct cookie name and options
-      res.clearCookie("connect.sid", {
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        httpOnly: true,
-      });
-      res.json({ success: true });
-    });
-  });
+  // With JWT, logout is handled client-side
+  res.json({ success: true, message: "Logout successful" });
 });
 
-apiRouter.post("/game/progress", async (req: Request, res: Response) => {
-  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+apiRouter.post(
+  "/game/progress",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { level, moves, completed } = req.body;
 
-  try {
-    const { level, moves, completed } = req.body;
-
-    // Validate input
-    if (!level || typeof level !== "number") {
-      return res.status(400).json({ error: "Invalid level" });
-    }
-
-    // First, get the current level
-    const userStatsResult = await pool.query(
-      `SELECT current_level, best_combination 
-       FROM game_stats WHERE user_id = $1`,
-      [req.user.id]
-    );
-
-    const userStats = userStatsResult.rows[0];
-    const currentLevel = userStats?.current_level || 1;
-
-    // Only update level if the completed level is the current one
-    // and we're moving to the next level
-    let newLevel = currentLevel;
-    if (completed && level === currentLevel) {
-      newLevel = currentLevel + 1;
-    }
-
-    // Store the moves as best combination if better than current
-    // or if no best combination exists for this level
-    let bestCombination = userStats?.best_combination || [];
-    if (Array.isArray(bestCombination)) {
-      // If this level doesn't have a best combination yet or new moves is better
-      if (!bestCombination[level - 1] || moves < bestCombination[level - 1]) {
-        // Create a copy of the array with the right length
-        const newBestCombination = [...bestCombination];
-        // Make sure the array is long enough
-        while (newBestCombination.length < level) {
-          newBestCombination.push(null);
-        }
-        // Set the new best for this level
-        newBestCombination[level - 1] = moves;
-        bestCombination = newBestCombination;
+      // Validate input
+      if (!level || typeof level !== "number") {
+        return res.status(400).json({ error: "Invalid level" });
       }
-    }
 
-    // Update the database
-    await pool.query(
-      `UPDATE game_stats
+      // First, get the current level
+      const userStatsResult = await pool.query(
+        `SELECT current_level, best_combination 
+       FROM game_stats WHERE user_id = $1`,
+        [req.user.id]
+      );
+
+      const userStats = userStatsResult.rows[0];
+      const currentLevel = userStats?.current_level || 1;
+
+      // Only update level if the completed level is the current one
+      // and we're moving to the next level
+      let newLevel = currentLevel;
+      if (completed && level === currentLevel) {
+        newLevel = currentLevel + 1;
+      }
+
+      // Store the moves as best combination if better than current
+      // or if no best combination exists for this level
+      let bestCombination = userStats?.best_combination || [];
+      if (Array.isArray(bestCombination)) {
+        // If this level doesn't have a best combination yet or new moves is better
+        if (!bestCombination[level - 1] || moves < bestCombination[level - 1]) {
+          // Create a copy of the array with the right length
+          const newBestCombination = [...bestCombination];
+          // Make sure the array is long enough
+          while (newBestCombination.length < level) {
+            newBestCombination.push(null);
+          }
+          // Set the new best for this level
+          newBestCombination[level - 1] = moves;
+          bestCombination = newBestCombination;
+        }
+      }
+
+      // Update the database
+      await pool.query(
+        `UPDATE game_stats
        SET current_level = $1, best_combination = $2
        WHERE user_id = $3`,
-      [newLevel, JSON.stringify(bestCombination), req.user.id]
-    );
+        [newLevel, JSON.stringify(bestCombination), req.user.id]
+      );
 
-    res.json({
-      success: true,
-      current_level: newLevel,
-      best_combination: bestCombination,
-    });
-  } catch (err) {
-    console.error("Game progress update error:", err);
-    res.status(500).json({ error: "Database error" });
+      res.json({
+        success: true,
+        current_level: newLevel,
+        best_combination: bestCombination,
+      });
+    } catch (err) {
+      console.error("Game progress update error:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   }
-});
+);
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   // Log the error with stack trace

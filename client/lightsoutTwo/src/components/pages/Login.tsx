@@ -142,9 +142,12 @@ const Login = () => {
         }
       );
 
-      if (response.status === 200 && response.data.user) {
-        // Force a full page reload to ensure session cookie is recognized
-        window.location.href = "/profile";
+      if (response.status === 200 && response.data.token) {
+        // Store JWT token
+        localStorage.setItem("authToken", response.data.token);
+
+        // Navigate to profile
+        navigate("/profile");
       }
     } catch (error: unknown) {
       console.error("Demo login failed:", error);
@@ -179,7 +182,11 @@ const Login = () => {
         password,
       });
 
-      if (response.status === 200) {
+      if (response.status === 200 && response.data.token) {
+        // Store JWT token
+        localStorage.setItem("authToken", response.data.token);
+
+        // Navigate to profile
         navigate("/profile");
       }
     } catch (error: unknown) {
@@ -261,8 +268,11 @@ const Login = () => {
 
       console.log("Registration response:", response);
 
-      if (response.status === 201) {
-        // No need to login separately - server already logs us in
+      if (response.status === 201 && response.data.token) {
+        // Store JWT token
+        localStorage.setItem("authToken", response.data.token);
+
+        // Navigate to profile
         navigate("/profile");
       }
     } catch (error: unknown) {

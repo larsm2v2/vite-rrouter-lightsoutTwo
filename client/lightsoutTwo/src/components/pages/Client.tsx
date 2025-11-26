@@ -18,9 +18,15 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 30000,
 });
 
-// Add request interceptor for debugging
+// Add request interceptor for debugging and JWT auth
 apiClient.interceptors.request.use(
   (config) => {
+    // Add JWT token to Authorization header if available
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     // Log requests in development
     if (import.meta.env.DEV) {
       console.log(`Request: ${config.method?.toUpperCase()} ${config.url}`);
@@ -80,6 +86,9 @@ apiClient.interceptors.response.use(
 
     // Handle unauthorized - session expired or not logged in
     if (error.response?.status === 401) {
+      // Clear invalid token
+      localStorage.removeItem("authToken");
+
       // Prevent redirect loops by checking time since last redirect
       const now = Date.now();
       if (now - lastAuthRedirect > redirectDebounceTime) {

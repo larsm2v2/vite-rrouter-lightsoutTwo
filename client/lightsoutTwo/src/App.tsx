@@ -6,6 +6,7 @@ import Game from "./components/pages/Game";
 import CreatePuzzle from "./components/pages/CreatePuzzle";
 import SavedMaps from "./components/pages/SavedMaps";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AuthCallback from "./components/auth/AuthCallback";
 // import Light from "./components/Light/Light.tsx";
 // import Stats from "./components/Stats/Stats.tsx";
 
@@ -14,21 +15,22 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
-      <Route 
-        path="/profile" 
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
+        path="/profile"
         element={
           <ProtectedRoute>
             <Profile />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/game" 
+      <Route
+        path="/game"
         element={
           <ProtectedRoute>
             <Game />
           </ProtectedRoute>
-        } 
+        }
       />
       <Route
         path="/game/custom/:level"
@@ -38,29 +40,29 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route 
-        path="/game/:level" 
+      <Route
+        path="/game/:level"
         element={
           <ProtectedRoute>
             <Game />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/create-puzzle" 
+      <Route
+        path="/create-puzzle"
         element={
           <ProtectedRoute>
             <CreatePuzzle />
           </ProtectedRoute>
-        } 
+        }
       />
-      <Route 
-        path="/saved-maps" 
+      <Route
+        path="/saved-maps"
         element={
           <ProtectedRoute>
             <SavedMaps />
           </ProtectedRoute>
-        } 
+        }
       />
     </Routes>
   );

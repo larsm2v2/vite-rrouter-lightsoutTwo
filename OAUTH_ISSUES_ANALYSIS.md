@@ -4,6 +4,22 @@
 
 The `/api/auth/check` endpoint returns `{authenticated: false}` even after successful OAuth login.
 
+## 🚨 **PRODUCTION ISSUE - CRITICAL**
+
+**Log Analysis from Cloud Run (Nov 26, 2025 03:40:32 UTC):**
+
+```
+=== AUTH CHECK DEBUG ===
+Cookies: [Object: null prototype] {}    ← NO COOKIE RECEIVED!
+SessionID: Qrk7fKr7_PlN3B-yoxXCMjpP-jinFG0j
+Session: Session { cookie: { domain: '.ttlo-two.web.app' } }
+User: undefined
+IsAuthenticated: false
+========================
+```
+
+**Root Cause:** Firebase Hosting is **NOT forwarding session cookies** to Cloud Run backend!
+
 ## 🔍 Root Causes Identified
 
 ### 1. **Cookie Domain Mismatch in Development** ✅ FIXED
@@ -64,20 +80,34 @@ The `/api/auth/check` endpoint returns `{authenticated: false}` even after succe
 
 ---
 
-### 5. **Missing COOKIE_DOMAIN in Production Environment**
+### 5. **Firebase Hosting Cookie Forwarding Issue** 🔴 **CRITICAL - IN PRODUCTION**
 
-**Issue:** Your Cloud Run deployment may not have `COOKIE_DOMAIN` set correctly.
+**Issue:** Firebase Hosting does NOT forward cookies to Cloud Run by default!
 
-**What you need:**
+**Evidence from logs:**
+
+- Request comes through Firebase Hosting (`via: '1.1 Firebase Hosting'`)
+- `cookie header: undefined`
+- `Cookies: [Object: null prototype] {}` (completely empty!)
+- Session created with `domain: '.ttlo-two.web.app'`
+- But browser never receives or sends the cookie
+
+**Why this happens:**
+Firebase Hosting → Cloud Run proxy strips cookies for security. This is a **known Firebase limitation**.
+
+**SOLUTION:** Remove `COOKIE_DOMAIN` from production environment!
+
 For production (Cloud Run), set these environment variables:
 
 ```bash
-COOKIE_DOMAIN=.ttlo-two.web.app
+# DO NOT SET COOKIE_DOMAIN - let it default to the request origin
 NODE_ENV=production
 SESSION_SECRET=<your-secret>
 GOOGLE_CALLBACK_URL=https://ttlo-two.web.app/api/auth/google/callback
 CLIENT_URL=https://ttlo-two.web.app
 ```
+
+The session cookie will be set for `ttlo-two.web.app` (no leading dot), which works with Firebase Hosting proxy.
 
 ---
 

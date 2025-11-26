@@ -6,6 +6,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { hashPassword, comparePassword } from "../config/auth/password";
 import pool from "../config/database";
+import { generateToken } from "../utils/jwt";
 
 declare module "express-session" {
   interface SessionData {
@@ -55,12 +56,22 @@ router.get(
     next();
   },
   passport.authenticate("google", {
-    failureRedirect: process.env.CLIENT_URL + "/login",
+    failureRedirect: process.env.CLIENT_URL + "/login?error=auth_failed",
     failureMessage: true,
+    session: false, // Don't use sessions
   }),
   (req, res) => {
-    console.log("Authentication successful, redirecting to profile");
-    res.redirect(process.env.CLIENT_URL + "/profile");
+    console.log("Authentication successful, generating JWT");
+
+    if (!req.user) {
+      return res.redirect(process.env.CLIENT_URL + "/login?error=no_user");
+    }
+
+    // Generate JWT token
+    const token = generateToken(req.user);
+
+    // Redirect to client with token in URL fragment (not query param for security)
+    res.redirect(process.env.CLIENT_URL + "/auth/callback?token=" + token);
   }
 );
 
@@ -72,18 +83,9 @@ router.get("/profile", (req, res) => {
 
 // Logout
 router.post("/logout", (req, res) => {
-  req.logout(() => {
-    req.session?.destroy(() => {
-      // Clear the correct cookie name that matches sessionConfig
-      res.clearCookie("connect.sid", {
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        httpOnly: true,
-      });
-      res.json({ success: true });
-    });
-  });
+  // With JWT, logout is handled client-side by removing the token
+  // Server doesn't need to do anything
+  res.json({ success: true, message: "Logout successful" });
 });
 
 // Registration route
@@ -136,28 +138,17 @@ router.post("/register", async (req: Request, res: Response) => {
     // Create game stats for the user
     await pool.query("INSERT INTO game_stats (user_id) VALUES ($1)", [user.id]);
 
-    // Auto-login the user
-    req.login(user, (err) => {
-      if (err) {
-        console.error("Auto-login error:", err);
-        return res.status(201).json({
-          message: "User registered successfully but login failed",
-          user: {
-            id: user.id,
-            email: user.email,
-            displayName: user.display_name,
-          },
-        });
-      }
+    // Generate JWT token
+    const token = generateToken(user);
 
-      return res.status(201).json({
-        message: "User registered and logged in successfully",
-        user: {
-          id: user.id,
-          email: user.email,
-          displayName: user.display_name,
-        },
-      });
+    return res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.display_name,
+      },
     });
   } catch (err) {
     console.error("Registration error:", err);
@@ -207,21 +198,17 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Set session
-    req.login(user, (err) => {
-      if (err) {
-        console.error("Login error:", err);
-        return res.status(500).json({ message: "Internal server error" });
-      }
+    // Generate JWT token
+    const token = generateToken(user);
 
-      return res.json({
-        message: "Login successful",
-        user: {
-          id: user.id,
-          email: user.email,
-          displayName: user.display_name,
-        },
-      });
+    return res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.display_name,
+      },
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -263,31 +250,20 @@ router.post("/demo", async (req: Request, res: Response) => {
       console.log("Using existing demo user with ID:", demoUser.id);
     }
 
-    // Log in the demo user and establish session
-    req.login(demoUser, (err) => {
-      if (err) {
-        console.error("Demo login error:", err);
-        return res.status(500).json({ message: "Demo mode failed" });
-      }
+    // Generate JWT token for demo user
+    const token = generateToken(demoUser);
 
-      // Explicitly save session before responding
-      req.session.save((saveErr) => {
-        if (saveErr) {
-          console.error("Session save error:", saveErr);
-        }
+    console.log("Demo login successful");
 
-        console.log("Demo login successful, sessionID:", req.sessionID);
-
-        return res.json({
-          message: "Demo mode activated",
-          user: {
-            id: demoUser.id,
-            email: demoUser.email,
-            displayName: demoUser.display_name,
-            isDemo: true,
-          },
-        });
-      });
+    return res.json({
+      message: "Demo mode activated",
+      token,
+      user: {
+        id: demoUser.id,
+        email: demoUser.email,
+        displayName: demoUser.display_name,
+        isDemo: true,
+      },
     });
   } catch (err) {
     console.error("Demo mode error:", err);
