@@ -61,17 +61,26 @@ router.get(
     session: false, // Don't use sessions
   }),
   (req, res) => {
-    console.log("Authentication successful, generating JWT");
+    try {
+      console.log("Authentication successful, generating JWT");
 
-    if (!req.user) {
-      return res.redirect(process.env.CLIENT_URL + "/login?error=no_user");
+      if (!req.user) {
+        console.error("No user found after authentication");
+        return res.redirect(process.env.CLIENT_URL + "/login?error=no_user");
+      }
+
+      // Generate JWT token
+      const token = generateToken(req.user);
+      console.log("JWT token generated, redirecting to client");
+
+      // Redirect to client with token in URL fragment (not query param for security)
+      res.redirect(process.env.CLIENT_URL + "/auth/callback?token=" + token);
+    } catch (error) {
+      console.error("Error in OAuth callback handler:", error);
+      res.redirect(
+        process.env.CLIENT_URL + "/login?error=token_generation_failed"
+      );
     }
-
-    // Generate JWT token
-    const token = generateToken(req.user);
-
-    // Redirect to client with token in URL fragment (not query param for security)
-    res.redirect(process.env.CLIENT_URL + "/auth/callback?token=" + token);
   }
 );
 
