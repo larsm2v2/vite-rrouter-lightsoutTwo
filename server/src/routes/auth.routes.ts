@@ -53,14 +53,35 @@ router.get(
           : req.query.code,
       error: req.query.error,
     });
+
+    // Set a timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      console.error(
+        "OAuth callback timeout - passport.authenticate is hanging"
+      );
+      if (!res.headersSent) {
+        res.redirect(process.env.CLIENT_URL + "/login?error=oauth_timeout");
+      }
+    }, 10000); // 10 second timeout
+
+    // Clear timeout when response is sent
+    res.on("finish", () => clearTimeout(timeout));
+
     next();
   },
   (req, res, next) => {
+    console.log("Calling passport.authenticate...");
     passport.authenticate("google", {
       failureRedirect: process.env.CLIENT_URL + "/login?error=auth_failed",
       failureMessage: true,
       session: true, // Need session for OAuth flow to work
-    })(req, res, next);
+    })(req, res, (err: any) => {
+      console.log("passport.authenticate callback invoked");
+      if (err) {
+        console.error("Passport authenticate error:", err);
+      }
+      next(err);
+    });
   },
   (req, res) => {
     try {
