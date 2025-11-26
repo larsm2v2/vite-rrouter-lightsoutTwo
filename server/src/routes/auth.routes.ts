@@ -74,7 +74,13 @@ router.get("/profile", (req, res) => {
 router.post("/logout", (req, res) => {
   req.logout(() => {
     req.session?.destroy(() => {
-      res.clearCookie("connect.sid");
+      // Clear the correct cookie name that matches sessionConfig
+      res.clearCookie("connect.sid", {
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        httpOnly: true,
+      });
       res.json({ success: true });
     });
   });

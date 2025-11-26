@@ -457,9 +457,20 @@ apiRouter.get("/profile", async (req, res) => {
 });
 
 apiRouter.get("/auth/check", (req, res) => {
+  // Enhanced debugging for auth check
+  console.log("=== AUTH CHECK DEBUG ===");
+  console.log("Headers:", JSON.stringify(req.headers, null, 2));
+  console.log("Cookies:", req.cookies);
+  console.log("SessionID:", req.sessionID);
+  console.log("Session:", req.session);
+  console.log("User:", req.user);
+  console.log(
+    "IsAuthenticated:",
+    req.isAuthenticated ? req.isAuthenticated() : "N/A"
+  );
+  console.log("========================");
+
   if (!req.user) {
-    console.log("Full Request: ", req);
-    console.log("Requested User: ", req.user);
     return res.status(200).json({ authenticated: false });
   }
 
@@ -532,7 +543,13 @@ apiRouter.get("/sample-stats", (req, res) => {
 apiRouter.post("/auth/logout", (req: Request, res: Response) => {
   req.logout(() => {
     req.session?.destroy(() => {
-      res.clearCookie("sessionId");
+      // Use correct cookie name and options
+      res.clearCookie("connect.sid", {
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        httpOnly: true,
+      });
       res.json({ success: true });
     });
   });

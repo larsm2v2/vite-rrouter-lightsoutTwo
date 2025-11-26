@@ -35,13 +35,17 @@ export const sessionConfig: session.SessionOptions = {
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    // CRITICAL FIX: Use 'none' for cross-origin requests, or rely on proxy
+    // If using Firebase Hosting proxy, 'lax' works because it's same-origin
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     httpOnly: true,
-    path: "/", // Keep as root path for Firebase Hosting
+    path: "/", // Root path to work across all routes
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    // Add domain if needed for subdomain sharing
+    ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
   },
   name: "connect.sid",
-  proxy: true, // Trust the proxy (Firebase Hosting)
+  proxy: true, // Trust the proxy (Firebase Hosting/Cloud Run)
   // Test-specific overrides
   ...(process.env.NODE_ENV === "test" && {
     cookie: {
