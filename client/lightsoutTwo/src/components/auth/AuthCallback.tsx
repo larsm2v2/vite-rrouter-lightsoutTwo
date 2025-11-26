@@ -32,19 +32,12 @@ const AuthCallback = () => {
           return;
         }
 
-        // Exchange code for tokens with Google
-        const tokenResponse = await exchangeCodeForTokens(code, verifier);
-        const { id_token, access_token } = tokenResponse;
-
-        if (!id_token) {
-          throw new Error("No id_token received from Google");
-        }
-
-        // Send id_token to backend for verification and JWT generation
+        // Send code and verifier to backend for token exchange
+        // Backend will exchange code for tokens using client_secret
         const backendResp = await fetch("/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id_token, access_token }),
+          body: JSON.stringify({ code, code_verifier: verifier }),
         });
 
         if (!backendResp.ok) {

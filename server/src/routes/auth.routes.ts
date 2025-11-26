@@ -315,10 +315,39 @@ router.post("/demo", async (req: Request, res: Response) => {
 // PKCE OAuth verification endpoint
 router.post("/verify", async (req: Request, res: Response) => {
   try {
-    const { id_token } = req.body;
+    const { code, code_verifier } = req.body;
+
+    if (!code || !code_verifier) {
+      return res.status(400).json({ error: "Missing code or code_verifier" });
+    }
+
+    // Exchange authorization code for tokens with Google
+    const tokenParams = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      redirect_uri: "https://ttlo-two.web.app/auth/callback",
+      code_verifier,
+    });
+
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: tokenParams.toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error("Token exchange failed:", errorText);
+      return res.status(401).json({ error: "Token exchange failed" });
+    }
+
+    const tokens = await tokenResponse.json();
+    const { id_token } = tokens;
 
     if (!id_token) {
-      return res.status(400).json({ error: "Missing id_token" });
+      return res.status(401).json({ error: "No id_token received from Google" });
     }
 
     // Verify the id_token with Google
