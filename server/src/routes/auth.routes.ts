@@ -4,9 +4,12 @@ import crypto from "crypto";
 import { Request, Response } from "express";
 import express from "express";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { hashPassword, comparePassword } from "../config/auth/password";
 import pool from "../config/database";
 import { generateToken } from "../utils/jwt";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 declare module "express-session" {
   interface SessionData {
@@ -306,6 +309,78 @@ router.post("/demo", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Demo mode error:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PKCE OAuth verification endpoint
+router.post("/verify", async (req: Request, res: Response) => {
+  try {
+    const { id_token } = req.body;
+
+    if (!id_token) {
+      return res.status(400).json({ error: "Missing id_token" });
+    }
+
+    // Verify the id_token with Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(401).json({ error: "Invalid id_token" });
+    }
+
+    const { sub: googleSub, email, name } = payload;
+
+    if (!googleSub || !email) {
+      return res
+        .status(401)
+        .json({ error: "Missing user information in id_token" });
+    }
+
+    // Find or create user in database
+    let userResult = await pool.query(
+      "SELECT id, email, display_name FROM users WHERE google_sub = $1",
+      [googleSub]
+    );
+
+    let user;
+
+    if (userResult.rows.length === 0) {
+      // Create new user
+      const displayName = name || email.split("@")[0];
+      const createResult = await pool.query(
+        `INSERT INTO users (google_sub, email, display_name, password, password_salt) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id, email, display_name`,
+        [googleSub, email, displayName, null, null]
+      );
+      user = createResult.rows[0];
+
+      // Create game stats for new user
+      await pool.query("INSERT INTO game_stats (user_id) VALUES ($1)", [
+        user.id,
+      ]);
+    } else {
+      user = userResult.rows[0];
+    }
+
+    // Generate JWT token for the user
+    const token = generateToken(user);
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.display_name,
+      },
+    });
+  } catch (err) {
+    console.error("OAuth verification error:", err);
+    return res.status(500).json({ error: "Verification failed" });
   }
 });
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "./Client";
 import "./Login.css";
 import API_URL from "../auth/config";
+import { startGoogleLogin } from "../../utils/authService";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -126,7 +127,7 @@ const Login = () => {
 
   const handleGoogleLogin = () => {
     setLoading(true);
-    // The redirect will happen via the href
+    startGoogleLogin(); // PKCE flow
   };
 
   const handleDemoLogin = async () => {
@@ -399,11 +400,11 @@ const Login = () => {
                 {loading ? "Please wait..." : "Try Demo (No Signup Required)"}
               </button>
 
-              <a
-                href={`${API_URL}/auth/google`}
-                className="provider-button google"
+              <button
                 onClick={handleGoogleLogin}
-                aria-disabled={loading}
+                className="provider-button google"
+                disabled={loading}
+                type="button"
               >
                 <svg className="provider-icon" viewBox="0 0 24 24">
                   <path
@@ -424,7 +425,7 @@ const Login = () => {
                   />
                 </svg>
                 {loading ? "Please wait..." : "Continue with Google"}
-              </a>
+              </button>
             </div>
           </div>
         )}
