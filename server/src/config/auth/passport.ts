@@ -78,10 +78,12 @@ export function configurePassport() {
       async (
         req: Request,
         issuer: string,
-        profile: GoogleProfile,
+        profile: any,
         done: VerifyCallback
       ) => {
         try {
+          console.log("=== PASSPORT STRATEGY INVOKED ===");
+          console.log("Issuer:", issuer);
           console.log(
             "OAuth profile received:",
             JSON.stringify(profile, null, 2)
@@ -201,7 +203,9 @@ export function configurePassport() {
 
           return done(null, user);
         } catch (err) {
+          console.error("=== OAUTH STRATEGY ERROR ===");
           console.error("OAuth error:", err);
+          console.error("Stack:", err instanceof Error ? err.stack : "No stack trace");
           return done(err as Error);
         }
       }
