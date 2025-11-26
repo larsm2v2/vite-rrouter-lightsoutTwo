@@ -410,14 +410,14 @@ apiRouter.get("/profile", requireAuth, async (req, res) => {
     const userResult = await pool.query(
       `SELECT id, email, display_name, avatar 
        FROM users WHERE id = $1`,
-      [req.user.id]
+      [req.user?.id]
     );
 
     // Get game stats
     const statsResult = await pool.query(
       `SELECT current_level, best_combination, saved_maps
        FROM game_stats WHERE user_id = $1`,
-      [req.user.id]
+      [req.user?.id]
     );
 
     // Base stats (ensure defaults)
@@ -547,7 +547,7 @@ apiRouter.post(
       const userStatsResult = await pool.query(
         `SELECT current_level, best_combination 
        FROM game_stats WHERE user_id = $1`,
-        [req.user.id]
+        [req.user?.id]
       );
 
       const userStats = userStatsResult.rows[0];
@@ -583,7 +583,7 @@ apiRouter.post(
         `UPDATE game_stats
        SET current_level = $1, best_combination = $2
        WHERE user_id = $3`,
-        [newLevel, JSON.stringify(bestCombination), req.user.id]
+        [newLevel, JSON.stringify(bestCombination), req.user?.id]
       );
 
       res.json({
