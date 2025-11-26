@@ -55,11 +55,13 @@ router.get(
     });
     next();
   },
-  passport.authenticate("google", {
-    failureRedirect: process.env.CLIENT_URL + "/login?error=auth_failed",
-    failureMessage: true,
-    session: false, // Don't use sessions
-  }),
+  (req, res, next) => {
+    passport.authenticate("google", {
+      failureRedirect: process.env.CLIENT_URL + "/login?error=auth_failed",
+      failureMessage: true,
+      session: true, // Need session for OAuth flow to work
+    })(req, res, next);
+  },
   (req, res) => {
     try {
       console.log("Authentication successful, generating JWT");
@@ -73,8 +75,14 @@ router.get(
       const token = generateToken(req.user);
       console.log("JWT token generated, redirecting to client");
 
-      // Redirect to client with token in URL fragment (not query param for security)
-      res.redirect(process.env.CLIENT_URL + "/auth/callback?token=" + token);
+      // Clear the session after getting the user (we only need it for OAuth)
+      req.logout((err) => {
+        if (err) {
+          console.error("Error logging out session:", err);
+        }
+        // Redirect to client with token
+        res.redirect(process.env.CLIENT_URL + "/auth/callback?token=" + token);
+      });
     } catch (error) {
       console.error("Error in OAuth callback handler:", error);
       res.redirect(
